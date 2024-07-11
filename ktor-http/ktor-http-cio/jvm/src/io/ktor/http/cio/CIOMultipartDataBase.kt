@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2019 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
+ * Copyright 2014-2024 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
  */
 
 package io.ktor.http.cio
@@ -11,6 +11,7 @@ import io.ktor.utils.io.core.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.*
 import kotlin.coroutines.*
+import kotlin.let
 
 /**
  * Represents a multipart data object that does parse and convert parts to ktor's [PartData]
@@ -67,8 +68,18 @@ public class CIOMultipartDataBase(
         val contentDisposition = headers["Content-Disposition"]?.let { ContentDisposition.parse(it.toString()) }
         val filename = contentDisposition?.parameter("filename")
 
+        val body = part.body
         if (filename == null) {
-            val packet = part.body.readRemaining(formFieldLimit.toLong()) // TODO fail if limit exceeded
+            val packet = body.readRemaining(formFieldLimit.toLong())
+            if (!body.isClosedForRead) {
+                body.awaitContent()
+                if (!body.isClosedForRead) {
+                    packet.release()
+                    val cause = IllegalStateException("Form field size limit exceeded: $formFieldLimit")
+                    body.cancel(cause)
+                    throw cause
+                }
+            }
 
             try {
                 return PartData.FormItem(packet.readText(), { part.release() }, CIOHeaders(headers))
@@ -77,6 +88,6 @@ public class CIOMultipartDataBase(
             }
         }
 
-        return PartData.FileItem({ part.body }, { part.release() }, CIOHeaders(headers))
+        return PartData.FileItem({ body }, { part.release() }, CIOHeaders(headers))
     }
 }
