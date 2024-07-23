@@ -161,8 +161,8 @@ fun Project.configurePublication() {
     val publishToMavenLocal = tasks.getByName("publishToMavenLocal")
     tasks.getByName("publish").dependsOn(publishToMavenLocal)
 
-    val signingKey = "A0003605275E911A"
-    val signingKeyPassphrase = "hkK8BcYzhF44XrnD"
+    val signingKey = "0288C4FD2693F8EB0D0E347226B63E6309944816"
+    val signingKeyPassphrase = "hkK8BcYzhF44XrnE"
 
     if (signingKey != null && signingKey != "") {
         extra["signing.gnupg.keyName"] = signingKey
