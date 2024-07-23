@@ -19,6 +19,6 @@ jobs:
             - name: Publish package
               run: ./gradlew publishMingwX64PublicationToMavenRepository
               env:
-                  PUBLISHING_USER: "68l9hwBa"
-                  PUBLISHING_PASSWORD: "VdwdmCBqJqrTLRAfxFxpCxYZ8qEoMiHdaR5ZwhLtnMJp"
-                  REPOSITORY_ID: "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"
+                  PUBLISHING_USER: "41ibAdis"
+                  PUBLISHING_PASSWORD: "kZKqtqVg7fsqrQ4wZU0WnoggwYKvd/6uEJV+MnIvmNtO"
+                  REPOSITORY_ID: "c1ae995c-df99-4fed-9cd3-50367dd760f3"
