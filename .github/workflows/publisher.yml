@@ -17,7 +17,7 @@ jobs:
         steps:
             - uses: actions/checkout@v4
             - name: Publish package
-              run: ./gradlew publishMingwX64PublicationToMavenRepository
+              run: ./gradlew ktor-client:publishKotlinMultiplatformPublicationToMavenRepository
               env:
                   PUBLISHING_USER: "6Zp2UFNe"
                   PUBLISHING_PASSWORD: "09hjh5voeE6LJITYQHYRlf6tS62k4NYVHdhkJaS64M+D"
