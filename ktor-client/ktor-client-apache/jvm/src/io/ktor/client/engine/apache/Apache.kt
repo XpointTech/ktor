@@ -25,14 +25,13 @@ import io.ktor.client.engine.*
  *
  * You can learn more about client engines from [Engines](https://ktor.io/docs/http-client-engines.html).
  */
-public object Apache : HttpClientEngineFactory<ApacheEngineConfig> {
+public data object Apache : HttpClientEngineFactory<ApacheEngineConfig> {
     override fun create(block: ApacheEngineConfig.() -> Unit): HttpClientEngine {
         val config = ApacheEngineConfig().apply(block)
         return ApacheEngine(config)
     }
 }
 
-@Suppress("KDocMissingDocumentation")
 public class ApacheEngineContainer : HttpClientEngineContainer {
     override val factory: HttpClientEngineFactory<*> = Apache
 

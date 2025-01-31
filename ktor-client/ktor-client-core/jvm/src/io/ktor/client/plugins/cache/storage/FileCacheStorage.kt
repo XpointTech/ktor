@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2022 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
+ * Copyright 2014-2024 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
  */
 
 package io.ktor.client.plugins.cache.storage
@@ -10,7 +10,6 @@ import io.ktor.util.*
 import io.ktor.util.collections.*
 import io.ktor.util.date.*
 import io.ktor.utils.io.*
-import io.ktor.utils.io.core.*
 import io.ktor.utils.io.jvm.javaio.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.*
@@ -22,6 +21,7 @@ import java.security.*
  * @param directory directory to store cache data.
  * @param dispatcher dispatcher to use for file operations.
  */
+@Suppress("FunctionName")
 public fun FileStorage(
     directory: File,
     dispatcher: CoroutineDispatcher = Dispatchers.IO
@@ -84,9 +84,8 @@ private class FileCacheStorage(
         }
     }
 
-    private fun key(url: Url) = hex(MessageDigest.getInstance("MD5").digest(url.toString().encodeToByteArray()))
+    private fun key(url: Url) = hex(MessageDigest.getInstance("SHA-256").digest(url.toString().encodeToByteArray()))
 
-    @OptIn(InternalAPI::class)
     private suspend fun writeCache(urlHex: String, caches: List<CachedResponseData>) = coroutineScope {
         val mutex = mutexes.computeIfAbsent(urlHex) { Mutex() }
         mutex.withLock {
@@ -132,7 +131,6 @@ private class FileCacheStorage(
         }
     }
 
-    @Suppress("DEPRECATION")
     private suspend fun writeCache(channel: ByteChannel, cache: CachedResponseData) {
         channel.writeStringUtf8(cache.url.toString() + "\n")
         channel.writeInt(cache.statusCode.value)

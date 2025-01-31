@@ -1,10 +1,11 @@
 /*
- * Copyright 2014-2019 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
+ * Copyright 2014-2024 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
  */
 
 package io.ktor.server.netty
 
 import io.ktor.util.cio.*
+import io.ktor.util.logging.*
 import io.netty.channel.*
 import io.netty.util.concurrent.*
 import io.netty.util.concurrent.Future
@@ -12,6 +13,8 @@ import kotlinx.coroutines.*
 import java.io.*
 import java.util.concurrent.*
 import kotlin.coroutines.*
+
+private val LOG = KtorSimpleLogger("io.ktor.server.netty.CIO")
 
 @Suppress("IMPLICIT_NOTHING_AS_TYPE_PARAMETER")
 private val identityErrorHandler = { t: Throwable, c: Continuation<*> ->
@@ -30,7 +33,9 @@ public suspend fun <T> Future<T>.suspendAwait(): T {
 private val wrappingErrorHandler = { t: Throwable, c: Continuation<*> ->
     if (t is IOException) {
         c.resumeWithException(ChannelWriteException("Write operation future failed", t))
-    } else c.resumeWithException(t)
+    } else {
+        c.resumeWithException(t)
+    }
 }
 
 /**
@@ -66,7 +71,13 @@ internal object NettyDispatcher : CoroutineDispatcher() {
 
     override fun dispatch(context: CoroutineContext, block: Runnable) {
         val nettyContext = context[CurrentContextKey]!!.context
-        nettyContext.executor().execute(block)
+        val result = runCatching {
+            nettyContext.executor().execute(block)
+        }
+
+        if (result.isFailure) {
+            LOG.error("Failed to dispatch", result.exceptionOrNull())
+        }
     }
 
     class CurrentContext(val context: ChannelHandlerContext) : AbstractCoroutineContextElement(CurrentContextKey)

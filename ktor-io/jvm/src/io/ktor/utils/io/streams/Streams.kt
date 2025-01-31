@@ -4,6 +4,8 @@
 
 package io.ktor.utils.io.streams
 
+import io.ktor.utils.io.ByteWriteChannel
+import io.ktor.utils.io.asByteWriteChannel
 import io.ktor.utils.io.core.*
 import kotlinx.io.*
 import kotlinx.io.Buffer
@@ -12,25 +14,21 @@ import java.io.*
 
 public fun InputStream.asInput(): Input = asSource().buffered()
 
-@Suppress("DEPRECATION")
-public fun ByteReadPacket.inputStream(): InputStream = asInputStream()
+public fun Source.inputStream(): InputStream = asInputStream()
 
-@Suppress("DEPRECATION")
 @OptIn(InternalIoApi::class)
-public fun OutputStream.writePacket(packet: ByteReadPacket) {
+public fun OutputStream.writePacket(packet: Source) {
     packet.buffer.copyTo(this)
 }
 
-@Suppress("DEPRECATION")
-public fun OutputStream.writePacket(block: BytePacketBuilder.() -> Unit) {
+public fun OutputStream.writePacket(block: Sink.() -> Unit) {
     val builder = Buffer()
     builder.block()
     writePacket(builder)
 }
 
-@Suppress("DEPRECATION")
 @OptIn(UnsafeIoApi::class)
-public fun InputStream.readPacketAtLeast(min: Int = 1): ByteReadPacket {
+public fun InputStream.readPacketAtLeast(min: Int = 1): Source {
     val buffer = Buffer()
     UnsafeBufferOperations.writeToTail(buffer, min) { array, start, end ->
         val read = read(array, start, end - start)
@@ -39,3 +37,18 @@ public fun InputStream.readPacketAtLeast(min: Int = 1): ByteReadPacket {
 
     return buffer
 }
+
+/**
+ * Converts this [OutputStream] into a [ByteWriteChannel], enabling asynchronous writing of byte sequences.
+ *
+ * ```kotlin
+ * val outputStream: OutputStream = FileOutputStream("file.txt")
+ * val channel: ByteWriteChannel = outputStream.asByteWriteChannel()
+ * channel.writeFully("Hello, World!".toByteArray())
+ * channel.flushAndClose() // Ensure the data is written to the OutputStream
+ * ```
+ *
+ * All operations on the [ByteWriteChannel] are buffered: the underlying [OutputStream] will be receiving bytes
+ * when the [ByteWriteChannel.flush] happens.
+ */
+public fun OutputStream.asByteWriteChannel(): ByteWriteChannel = asSink().asByteWriteChannel()

@@ -11,7 +11,6 @@ import kotlinx.io.*
 import kotlinx.io.Buffer
 import kotlinx.io.unsafe.*
 import kotlin.coroutines.*
-import kotlin.jvm.*
 
 @OptIn(InternalAPI::class)
 public suspend fun ByteWriteChannel.writeByte(value: Byte) {
@@ -28,6 +27,26 @@ public suspend fun ByteWriteChannel.writeShort(value: Short) {
 @OptIn(InternalAPI::class)
 public suspend fun ByteWriteChannel.writeInt(value: Int) {
     writeBuffer.writeInt(value)
+    flushIfNeeded()
+}
+
+/**
+ * Writes a 32-bit floating-point [value] to the current [ByteWriteChannel].
+ */
+@OptIn(InternalAPI::class)
+public suspend fun ByteWriteChannel.writeFloat(value: Float) {
+    writeBuffer.writeFloat(value)
+    flushIfNeeded()
+}
+
+/**
+ * Writes a 64-bit floating-point value to the current [ByteWriteChannel].
+ *
+ * @param value The floating-point value to be written to the channel.
+ */
+@OptIn(InternalAPI::class)
+public suspend fun ByteWriteChannel.writeDouble(value: Double) {
+    writeBuffer.writeDouble(value)
     flushIfNeeded()
 }
 
@@ -62,7 +81,7 @@ public suspend fun ByteWriteChannel.writeFully(value: ByteArray, startIndex: Int
 }
 
 @OptIn(InternalAPI::class)
-public suspend fun ByteWriteChannel.writeBuffer(value: Source) {
+public suspend fun ByteWriteChannel.writeBuffer(value: RawSource) {
     writeBuffer.transferFrom(value)
     flushIfNeeded()
 }
@@ -197,9 +216,7 @@ internal fun <R> (suspend () -> R).fireAndForget() {
 }
 
 private val NO_CALLBACK = object : Continuation<Any?> {
-    override val context: CoroutineContext
-        get() = EmptyCoroutineContext
+    override val context: CoroutineContext = EmptyCoroutineContext
 
-    override fun resumeWith(result: Result<Any?>) {
-    }
+    override fun resumeWith(result: Result<Any?>) = Unit
 }

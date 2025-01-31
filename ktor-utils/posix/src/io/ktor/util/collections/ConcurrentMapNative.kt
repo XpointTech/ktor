@@ -1,6 +1,5 @@
-// ktlint-disable filename
 /*
- * Copyright 2014-2021 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
+ * Copyright 2014-2024 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
  */
 
 package io.ktor.util.collections
@@ -77,5 +76,5 @@ public actual class ConcurrentMap<Key, Value> public actual constructor(
         return other == delegate
     }
 
-    override fun toString(): String = "ConcurrentMapJs by $delegate"
+    override fun toString(): String = "ConcurrentMapNative by $delegate"
 }

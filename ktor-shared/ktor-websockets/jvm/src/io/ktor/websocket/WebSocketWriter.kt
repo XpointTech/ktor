@@ -35,12 +35,10 @@ public class WebSocketWriter(
      */
     public val outgoing: SendChannel<Frame> get() = queue
 
-    @OptIn(ExperimentalCoroutinesApi::class)
     private val writeLoopJob = launch(context = CoroutineName("ws-writer"), start = CoroutineStart.ATOMIC) {
         pool.useInstance { writeLoop(it) }
     }
 
-    @Suppress("DEPRECATION")
     private suspend fun writeLoop(buffer: ByteBuffer) {
         buffer.clear()
         try {
@@ -61,7 +59,7 @@ public class WebSocketWriter(
             queue.close(t)
         } finally {
             queue.close(CancellationException("WebSocket closed.", null))
-            writeChannel.close()
+            writeChannel.flushAndClose()
         }
 
         drainQueueAndDiscard()
@@ -165,7 +163,7 @@ public class WebSocketWriter(
 
     private class FlushRequest(parent: Job?) {
         private val done: CompletableJob = Job(parent)
-        public fun complete(): Boolean = done.complete()
+        fun complete(): Boolean = done.complete()
         suspend fun await(): Unit = done.join()
     }
 }

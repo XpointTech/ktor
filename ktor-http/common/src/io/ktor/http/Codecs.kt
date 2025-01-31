@@ -1,10 +1,12 @@
 /*
-* Copyright 2014-2021 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
-*/
+ * Copyright 2014-2024 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
+ */
+
 package io.ktor.http
 
 import io.ktor.utils.io.charsets.*
 import io.ktor.utils.io.core.*
+import kotlinx.io.*
 
 private val URL_ALPHABET = ((('a'..'z') + ('A'..'Z') + ('0'..'9')).map { it.code.toByte() }).toSet()
 private val URL_ALPHABET_CHARS = ((('a'..'z') + ('A'..'Z') + ('0'..'9'))).toSet()
@@ -88,7 +90,8 @@ public fun String.encodeURLPath(
             continue
         }
 
-        if (!encodeEncoded && current == '%' &&
+        if (!encodeEncoded &&
+            current == '%' &&
             index + 2 < this@encodeURLPath.length &&
             this@encodeURLPath[index + 1] in HEX_ALPHABET &&
             this@encodeURLPath[index + 2] in HEX_ALPHABET
@@ -196,7 +199,6 @@ private fun String.decodeScan(start: Int, end: Int, plusIsSpace: Boolean, charse
     return if (start == 0 && end == length) toString() else substring(start, end)
 }
 
-@Suppress("DEPRECATION")
 private fun CharSequence.decodeImpl(
     start: Int,
     end: Int,
@@ -254,7 +256,7 @@ private fun CharSequence.decodeImpl(
 
                 // Decode chars from bytes and put into StringBuilder
                 // Note: Tried using ByteBuffer and using enc.decode() – it's slower
-                sb.append(String(bytes, offset = 0, length = count, charset = charset))
+                sb.append(bytes.decodeToString(0, 0 + count))
             }
             else -> {
                 sb.append(c)
@@ -292,8 +294,7 @@ private fun hexDigitToChar(digit: Int): Char = when (digit) {
     else -> 'A' + digit - 10
 }
 
-@Suppress("DEPRECATION")
-private fun ByteReadPacket.forEach(block: (Byte) -> Unit) {
+private fun Source.forEach(block: (Byte) -> Unit) {
     takeWhile { buffer ->
         while (buffer.canRead()) {
             block(buffer.readByte())

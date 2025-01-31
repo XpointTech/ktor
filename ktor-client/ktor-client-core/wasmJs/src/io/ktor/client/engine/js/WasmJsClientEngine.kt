@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2023 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
+ * Copyright 2014-2025 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
  */
 
 package io.ktor.client.engine.js
@@ -16,10 +16,11 @@ import io.ktor.util.*
 import io.ktor.util.date.*
 import io.ktor.utils.io.*
 import kotlinx.coroutines.*
-import kotlinx.coroutines.CancellationException
-import org.w3c.dom.*
-import org.w3c.dom.events.*
-import kotlin.coroutines.*
+import org.w3c.dom.WebSocket
+import org.w3c.dom.events.Event
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 @Suppress("UNUSED_PARAMETER")
 private fun createBrowserWebSocket(urlString_capturingHack: String, vararg protocols: String): WebSocket =
@@ -55,15 +56,10 @@ internal class JsClientEngine(
 
         val requestTime = GMTDate()
         val rawRequest = data.toRaw(clientConfig, callContext)
-        val controller = AbortController()
-        rawRequest.signal = controller.signal
-        callContext.job.invokeOnCompletion(onCancelling = true) {
-            controller.abort()
-        }
+        val rawResponse = commonFetch(data.url.toString(), rawRequest, config, callContext.job)
 
-        val rawResponse = commonFetch(data.url.toString(), rawRequest, config)
         val status = HttpStatusCode(rawResponse.status.toInt(), rawResponse.statusText)
-        val headers = rawResponse.headers.mapToKtor()
+        val headers = rawResponse.headers.mapToKtor(data.method, data.attributes)
         val version = HttpProtocolVersion.HTTP_1_1
 
         val body = CoroutineScope(callContext).readBody(rawResponse)
@@ -81,18 +77,18 @@ internal class JsClientEngine(
         )
     }
 
-    private fun createWebSocket(
+    private suspend fun createWebSocket(
         urlString: String,
         headers: Headers
     ): WebSocket {
         val protocolHeaderNames = headers.names().filter { headerName ->
-            headerName.equals("sec-websocket-protocol", true)
+            headerName.equals(HttpHeaders.SecWebSocketProtocol, ignoreCase = true)
         }
         val protocols = protocolHeaderNames.mapNotNull { headers.getAll(it) }.flatten().toTypedArray()
-        return when (PlatformUtils.platform) {
-            Platform.Browser -> createBrowserWebSocket(urlString, *protocols)
+        return when {
+            PlatformUtils.IS_BROWSER -> createBrowserWebSocket(urlString, *protocols)
             else -> {
-                val ws_capturingHack = makeRequire<JsAny>("ws")
+                val ws_capturingHack = makeImport<JsAny>("ws").await<JsAny>().get("default")
                 val headers_capturingHack = makeJsObject<JsAny>()
                 headers.forEach { name, values ->
                     headers_capturingHack[name] = values.joinToString(",")
@@ -120,10 +116,13 @@ internal class JsClientEngine(
 
         val session = JsWebSocketSession(callContext, socket)
 
+        val protocol = socket.protocol.takeIf { it.isNotEmpty() }
+        val headers = if (protocol != null) headersOf(HttpHeaders.SecWebSocketProtocol, protocol) else Headers.Empty
+
         return HttpResponseData(
             HttpStatusCode.SwitchingProtocols,
             requestTime,
-            Headers.Empty,
+            headers,
             HttpProtocolVersion.HTTP_1_1,
             session,
             callContext
@@ -163,13 +162,22 @@ private fun eventAsString(event: Event): String =
 private fun getKeys(headers: org.w3c.fetch.Headers): JsArray<JsString> =
     js("Array.from(headers.keys())")
 
-internal fun org.w3c.fetch.Headers.mapToKtor(): Headers = buildHeaders {
+@OptIn(InternalAPI::class)
+internal fun org.w3c.fetch.Headers.mapToKtor(method: HttpMethod, attributes: Attributes): Headers = buildHeaders {
     val keys = getKeys(this@mapToKtor)
     for (i in 0 until keys.length) {
         val key = keys[i].toString()
         val value = this@mapToKtor.get(key)!!
         append(key, value)
     }
+
+    // Content-Encoding is hidden for cross-origin calls,
+    // so browser requests should always ignore Content-Length
+    dropCompressionHeaders(
+        method,
+        attributes,
+        alwaysRemove = PlatformUtils.IS_BROWSER
+    )
 }
 
 /**

@@ -1,26 +1,19 @@
-import test.server.*
-
 /*
-* Copyright 2014-2021 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
-*/
+ * Copyright 2014-2025 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
+ */
 
 description = "Common tests for client"
 
 plugins {
     id("kotlinx-serialization")
+    id("test-server")
 }
-
-apply<TestServerPlugin>()
-
-val osName = System.getProperty("os.name")
 
 kotlin.sourceSets {
     commonMain {
         dependencies {
+            api(project(":ktor-client:ktor-client-test-base"))
             api(project(":ktor-client:ktor-client-mock"))
-            api(project(":ktor-test-dispatcher"))
-            api(libs.kotlin.test)
-            api(libs.kotlinx.coroutines.test)
         }
     }
     commonTest {
@@ -35,7 +28,6 @@ kotlin.sourceSets {
             api(project(":ktor-client:ktor-client-plugins:ktor-client-json:ktor-client-serialization"))
             api(project(":ktor-shared:ktor-serialization:ktor-serialization-kotlinx"))
             api(project(":ktor-shared:ktor-serialization:ktor-serialization-kotlinx:ktor-serialization-kotlinx-json"))
-            api(libs.kotlin.test)
         }
     }
     jvmMain {
@@ -49,9 +41,6 @@ kotlin.sourceSets {
             api(project(":ktor-server:ktor-server-plugins:ktor-server-websockets"))
             api(project(":ktor-shared:ktor-serialization:ktor-serialization-kotlinx"))
             api(libs.logback.classic)
-            api(libs.junit)
-            api(kotlin("test-junit5"))
-            implementation(libs.kotlinx.coroutines.debug)
         }
     }
 
@@ -61,18 +50,16 @@ kotlin.sourceSets {
             api(project(":ktor-client:ktor-client-apache5"))
             runtimeOnly(project(":ktor-client:ktor-client-android"))
             runtimeOnly(project(":ktor-client:ktor-client-okhttp"))
-            if (currentJdk >= 11) {
-                runtimeOnly(project(":ktor-client:ktor-client-java"))
-            }
+            runtimeOnly(project(":ktor-client:ktor-client-java"))
             implementation(project(":ktor-client:ktor-client-plugins:ktor-client-logging"))
             implementation(libs.kotlinx.coroutines.slf4j)
             implementation(libs.junit)
         }
     }
 
-    jvmAndNixTest {
+    commonTest {
         dependencies {
-            runtimeOnly(project(":ktor-client:ktor-client-cio"))
+            api(project(":ktor-client:ktor-client-cio"))
         }
     }
 
@@ -101,5 +88,3 @@ kotlin.sourceSets {
         }
     }
 }
-
-useJdkVersionForJvmTests(11)

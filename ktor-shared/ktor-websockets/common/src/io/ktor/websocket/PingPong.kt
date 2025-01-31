@@ -6,6 +6,7 @@ package io.ktor.websocket
 
 import io.ktor.util.*
 import io.ktor.util.date.*
+import io.ktor.utils.io.ClosedByteChannelException
 import io.ktor.utils.io.charsets.*
 import io.ktor.utils.io.core.*
 import kotlinx.coroutines.*
@@ -42,7 +43,7 @@ internal fun CoroutineScope.ponger(
  * Launch pinger coroutine on [CoroutineScope] that is sending ping every specified [periodMillis] to [outgoing] channel,
  * waiting for and verifying client's pong frames. It is also handling [timeoutMillis] and sending timeout close frame
  */
-@Suppress("DEPRECATION")
+
 internal fun CoroutineScope.pinger(
     outgoing: SendChannel<Frame>,
     periodMillis: Long,
@@ -78,7 +79,7 @@ internal fun CoroutineScope.pinger(
                     // wait for valid pong message
                     while (true) {
                         val msg = channel.receive()
-                        if (String(msg.data, charset = Charsets.ISO_8859_1) == pingMessage) {
+                        if (msg.data.decodeToString(0, 0 + msg.data.size) == pingMessage) {
                             LOGGER.trace("WebSocket Pinger: received valid pong frame $msg")
                             break
                         }
@@ -100,6 +101,7 @@ internal fun CoroutineScope.pinger(
         } catch (ignore: CancellationException) {
         } catch (ignore: ClosedReceiveChannelException) {
         } catch (ignore: ClosedSendChannelException) {
+        } catch (ignore: ClosedByteChannelException) {
         }
     }
 

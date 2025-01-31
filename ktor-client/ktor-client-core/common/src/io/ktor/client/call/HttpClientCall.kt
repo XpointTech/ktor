@@ -64,7 +64,7 @@ public open class HttpClientCall(
     protected open val allowDoubleReceive: Boolean = false
 
     @OptIn(InternalAPI::class)
-    protected open suspend fun getResponseContent(): ByteReadChannel = response.content
+    protected open suspend fun getResponseContent(): ByteReadChannel = response.rawContent
 
     /**
      * Tries to receive the payload of the [response] as a specific expected type provided in [info].
@@ -73,7 +73,6 @@ public open class HttpClientCall(
      * @throws NoTransformationFoundException If no transformation is found for the type [info].
      * @throws DoubleReceiveException If already called [body].
      */
-    @OptIn(InternalAPI::class)
     public suspend fun bodyNullable(info: TypeInfo): Any? {
         try {
             if (response.instanceOf(info.type)) return response
@@ -96,8 +95,6 @@ public open class HttpClientCall(
         } catch (cause: Throwable) {
             response.cancel("Receive failed", cause)
             throw cause
-        } finally {
-            response.complete()
         }
     }
 
@@ -109,7 +106,6 @@ public open class HttpClientCall(
      * @throws DoubleReceiveException If already called [body].
      * @throws NullPointerException If content is `null`.
      */
-    @OptIn(InternalAPI::class)
     public suspend fun body(info: TypeInfo): Any = bodyNullable(info)!!
 
     override fun toString(): String = "HttpClientCall[${request.url}, ${response.status}]"
@@ -155,7 +151,7 @@ public suspend fun <T> HttpResponse.body(typeInfo: TypeInfo): T = call.bodyNulla
 /**
  * Exception representing that the response payload has already been received.
  */
-@Suppress("KDocMissingDocumentation")
+
 public class DoubleReceiveException(call: HttpClientCall) : IllegalStateException() {
     override val message: String = "Response already received: $call"
 }
@@ -182,7 +178,7 @@ public class NoTransformationFoundException(
     from: KClass<*>,
     to: KClass<*>
 ) : UnsupportedOperationException() {
-    override val message: String? = """
+    override val message: String = """
         Expected response body of the type '$to' but was '$from'
         In response from `${response.request.url}`
         Response status `${response.status}`

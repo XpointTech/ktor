@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2021 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
+ * Copyright 2014-2024 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
  */
 
 package io.ktor.server.engine
@@ -29,14 +29,14 @@ public actual class EmbeddedServer<
     TConfiguration : ApplicationEngine.Configuration
     >
 actual constructor(
-    private val applicationProperties: ApplicationProperties,
+    private val rootConfig: ServerConfig,
     engineFactory: ApplicationEngineFactory<TEngine, TConfiguration>,
     engineConfigBlock: TConfiguration.() -> Unit
 ) {
 
-    public actual val monitor: Events = Events()
+    public actual val monitor: Events = rootConfig.environment.monitor
 
-    public actual val environment: ApplicationEnvironment = applicationProperties.environment
+    public actual val environment: ApplicationEnvironment = rootConfig.environment
 
     public actual val application: Application
         get() = currentApplication()
@@ -44,11 +44,11 @@ actual constructor(
     public actual val engineConfig: TConfiguration = engineFactory.configuration(engineConfigBlock)
     private val applicationInstanceLock = ReentrantReadWriteLock()
     private var recreateInstance: Boolean = false
-    private var _applicationClassLoader: ClassLoader? = null
+    private var applicationClassLoader: ClassLoader? = null
     private var packageWatchKeys = emptyList<WatchKey>()
 
     private val configuredWatchPath = environment.config.propertyOrNull("ktor.deployment.watch")?.getList().orEmpty()
-    private val watchPatterns: List<String> = configuredWatchPath + applicationProperties.watchPaths
+    private val watchPatterns: List<String> = configuredWatchPath + rootConfig.watchPaths
 
     private val configModulesNames: List<String> = run {
         environment.config.propertyOrNull("ktor.application.modules")?.getList() ?: emptyList()
@@ -56,19 +56,19 @@ actual constructor(
 
     private val modulesNames: List<String> = configModulesNames
 
-    private var _applicationInstance: Application? = Application(
+    private var applicationInstance: Application? = Application(
         environment,
-        applicationProperties.developmentMode,
-        applicationProperties.rootPath,
+        rootConfig.developmentMode,
+        rootConfig.rootPath,
         monitor,
-        applicationProperties.parentCoroutineContext,
+        rootConfig.parentCoroutineContext,
         ::engine
     )
 
     public actual val engine: TEngine = engineFactory.create(
         environment,
         monitor,
-        applicationProperties.developmentMode,
+        rootConfig.developmentMode,
         engineConfig,
         ::currentApplication
     )
@@ -88,48 +88,63 @@ actual constructor(
         applicationInstanceLock.write {
             destroyApplication()
             val (application, classLoader) = createApplication()
-            _applicationInstance = application
-            _applicationClassLoader = classLoader
+            applicationInstance = application
+            applicationClassLoader = classLoader
         }
     }
 
     private fun currentApplication(): Application = applicationInstanceLock.read {
-        val currentApplication = _applicationInstance ?: error("EmbeddedServer was stopped")
+        val currentApplication = applicationInstance ?: error("EmbeddedServer was stopped")
 
-        if (!applicationProperties.developmentMode) {
+        if (!rootConfig.developmentMode) {
             return@read currentApplication
         }
 
-        val changes = packageWatchKeys.flatMap { it.pollEvents() }
-        if (changes.isEmpty()) {
+        if (getFileChanges().isNullOrEmpty()) {
             return@read currentApplication
         }
-
-        environment.log.info("Changes in application detected.")
-
-        var count = changes.size
-        while (true) {
-            Thread.sleep(200)
-            val moreChanges = packageWatchKeys.flatMap { it.pollEvents() }
-            if (moreChanges.isEmpty()) {
-                break
-            }
-
-            environment.log.debug("Waiting for more changes.")
-            count += moreChanges.size
-        }
-
-        environment.log.debug("Changes to $count files caused application restart.")
-        changes.take(5).forEach { environment.log.debug("...  ${it.context()}") }
 
         applicationInstanceLock.write {
             destroyApplication()
             val (application, classLoader) = createApplication()
-            _applicationInstance = application
-            _applicationClassLoader = classLoader
+            applicationInstance = application
+            applicationClassLoader = classLoader
         }
 
-        return@read _applicationInstance ?: error("EmbeddedServer was stopped")
+        return@read applicationInstance ?: error("EmbeddedServer was stopped")
+    }
+
+    private fun getFileChanges(): List<WatchEvent<*>>? {
+        try {
+            val changes = packageWatchKeys.flatMap { it.pollEvents() }
+            if (changes.isEmpty()) {
+                return changes
+            }
+
+            environment.log.info("Changes in application detected.")
+
+            var count = changes.size
+            while (true) {
+                Thread.sleep(200)
+                val moreChanges = packageWatchKeys.flatMap { it.pollEvents() }
+                if (moreChanges.isEmpty()) {
+                    break
+                }
+
+                environment.log.debug("Waiting for more changes.")
+                count += moreChanges.size
+            }
+
+            environment.log.debug("Changes to $count files caused application restart.")
+            changes.take(5).forEach { environment.log.debug("...  {}", it.context()) }
+            return changes
+        } catch (e: InterruptedException) {
+            environment.log.debug("Watch service was interrupted", e)
+            return null
+        } catch (e: ClosedWatchServiceException) {
+            environment.log.debug("Watch service was closed", e)
+            return null
+        }
     }
 
     private fun createApplication(): Pair<Application, ClassLoader> {
@@ -145,11 +160,10 @@ actual constructor(
         }
     }
 
-    @Suppress("DEPRECATION")
     private fun createClassLoader(): ClassLoader {
         val baseClassLoader = environment.classLoader
 
-        if (!applicationProperties.developmentMode) {
+        if (!rootConfig.developmentMode) {
             environment.log.info("Autoreload is disabled because the development mode is off.")
             return baseClassLoader
         }
@@ -180,7 +194,8 @@ actual constructor(
         ).mapNotNullTo(HashSet()) { it.protectionDomain.codeSource.location }
 
         val watchUrls = allUrls.filter { url ->
-            url !in coreUrls && watchPatterns.any { pattern -> url.toString().contains(pattern) } &&
+            url !in coreUrls &&
+                watchPatterns.any { pattern -> checkUrlMatches(url, pattern) } &&
                 !(url.path ?: "").startsWith(jre)
         }
 
@@ -200,16 +215,16 @@ actual constructor(
     }
 
     private fun destroyApplication() {
-        val currentApplication = _applicationInstance
-        val applicationClassLoader = _applicationClassLoader
-        _applicationInstance = null
-        _applicationClassLoader = null
+        val currentApplication = applicationInstance
+        val currentApplicationClassLoader = applicationClassLoader
+        applicationInstance = null
+        applicationClassLoader = null
 
         if (currentApplication != null) {
             safeRaiseEvent(ApplicationStopping, currentApplication)
             try {
                 currentApplication.dispose()
-                (applicationClassLoader as? OverridingClassLoader)?.close()
+                (currentApplicationClassLoader as? OverridingClassLoader)?.close()
             } catch (e: Throwable) {
                 environment.log.error("Failed to destroy application instance.", e)
             }
@@ -265,6 +280,8 @@ actual constructor(
     }
 
     public actual fun start(wait: Boolean): EmbeddedServer<TEngine, TConfiguration> {
+        addShutdownHook { stop() }
+
         applicationInstanceLock.write {
             val (application, classLoader) = try {
                 createApplication()
@@ -276,8 +293,8 @@ actual constructor(
 
                 throw cause
             }
-            _applicationInstance = application
-            _applicationClassLoader = classLoader
+            applicationInstance = application
+            applicationClassLoader = classLoader
         }
 
         CoroutineScope(application.coroutineContext).launch {
@@ -293,8 +310,16 @@ actual constructor(
         return this
     }
 
+    public actual suspend fun startSuspend(wait: Boolean): EmbeddedServer<TEngine, TConfiguration> {
+        return withContext(Dispatchers.IOBridge) { start(wait) }
+    }
+
     public fun stop(shutdownGracePeriod: Long, shutdownTimeout: Long, timeUnit: TimeUnit) {
-        engine.stop(timeUnit.toMillis(shutdownGracePeriod), timeUnit.toMillis(shutdownTimeout))
+        try {
+            engine.stop(timeUnit.toMillis(shutdownGracePeriod), timeUnit.toMillis(shutdownTimeout))
+        } catch (e: Exception) {
+            environment.log.warn("Exception occurred during engine shutdown", e)
+        }
         applicationInstanceLock.write {
             destroyApplication()
         }
@@ -307,19 +332,23 @@ actual constructor(
         stop(gracePeriodMillis, timeoutMillis, TimeUnit.MILLISECONDS)
     }
 
+    public actual suspend fun stopSuspend(gracePeriodMillis: Long, timeoutMillis: Long) {
+        withContext(Dispatchers.IOBridge) { stop(gracePeriodMillis, timeoutMillis) }
+    }
+
     private fun instantiateAndConfigureApplication(currentClassLoader: ClassLoader): Application {
-        val newInstance = if (recreateInstance || _applicationInstance == null) {
+        val newInstance = if (recreateInstance || applicationInstance == null) {
             Application(
                 environment,
-                applicationProperties.developmentMode,
-                applicationProperties.rootPath,
+                rootConfig.developmentMode,
+                rootConfig.rootPath,
                 monitor,
-                applicationProperties.parentCoroutineContext,
+                rootConfig.parentCoroutineContext,
                 ::engine
             )
         } else {
             recreateInstance = true
-            _applicationInstance!!
+            applicationInstance!!
         }
 
         safeRaiseEvent(ApplicationStarting, newInstance)
@@ -329,7 +358,7 @@ actual constructor(
                 launchModuleByName(name, currentClassLoader, newInstance)
             }
 
-            applicationProperties.modules.forEach { module ->
+            rootConfig.modules.forEach { module ->
                 val name = module.methodName()
 
                 try {
@@ -377,9 +406,12 @@ actual constructor(
     }
 
     private fun cleanupWatcher() {
-        try {
-            watcher?.close()
-        } catch (_: NoClassDefFoundError) {
-        }
+        runCatching { watcher?.close() }
     }
+}
+
+internal fun checkUrlMatches(url: URL, pattern: String): Boolean {
+    val urlPath = url.path?.replace(File.separatorChar, '/') ?: return false
+    val normalizedPattern = pattern.replace(File.separatorChar, '/')
+    return urlPath.contains(normalizedPattern, ignoreCase = true)
 }

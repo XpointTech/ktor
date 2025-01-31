@@ -1,10 +1,9 @@
 /*
- * Copyright 2014-2021 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
+ * Copyright 2014-2024 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
  */
 
 package io.ktor.client.plugins
 
-import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.network.sockets.*
 import io.ktor.client.plugins.api.*
@@ -36,8 +35,25 @@ public class HttpRequestRetryConfig {
     internal lateinit var shouldRetry: HttpRetryShouldRetryContext.(HttpRequest, HttpResponse) -> Boolean
     internal lateinit var shouldRetryOnException: HttpRetryShouldRetryContext.(HttpRequestBuilder, Throwable) -> Boolean
     internal lateinit var delayMillis: HttpRetryDelayContext.(Int) -> Long
-    internal var modifyRequest: HttpRetryModifyRequestContext.(HttpRequestBuilder) -> Unit = {}
     internal var delay: suspend (Long) -> Unit = { kotlinx.coroutines.delay(it) }
+
+    /**
+     * Function that determines whether a request should be retried based on the response.
+     */
+    public val retryIf: (HttpRetryShouldRetryContext.(HttpRequest, HttpResponse) -> Boolean)?
+        get() = if (::shouldRetry.isInitialized) shouldRetry else null
+
+    /**
+     * Function that determines whether a request should be retried based on the exception.
+     */
+    public val retryOnExceptionIf: (HttpRetryShouldRetryContext.(HttpRequestBuilder, Throwable) -> Boolean)?
+        get() = if (::shouldRetryOnException.isInitialized) shouldRetryOnException else null
+
+    /**
+     * Indicated how the request should be modified before retrying.
+     */
+    public var modifyRequest: HttpRetryModifyRequestContext.(HttpRequestBuilder) -> Unit = {}
+        private set
 
     /**
      * The maximum amount of retries to perform for a request.
@@ -163,20 +179,25 @@ public class HttpRequestRetryConfig {
 
     /**
      * Specifies an exponential delay between retries, which is calculated using the Exponential backoff algorithm.
-     * This delay equals to `base ^ retryCount * 1000 + [0..randomizationMs]`
+     * This delay equals to `(base ^ retryCount-1) * baseDelayMs + [0..randomizationMs]`.
+     *
+     * For the defaults (base delay 1000ms, base 2), this results in 1000ms, 2000ms, 4000ms, 8000ms ... plus a random
+     * value up to 1000ms.
      */
     public fun exponentialDelay(
         base: Double = 2.0,
+        baseDelayMs: Long = 1000,
         maxDelayMs: Long = 60000,
         randomizationMs: Long = 1000,
         respectRetryAfterHeader: Boolean = true
     ) {
         check(base > 0)
+        check(baseDelayMs > 0)
         check(maxDelayMs > 0)
         check(randomizationMs >= 0)
 
         delayMillis(respectRetryAfterHeader) { retry ->
-            val delay = minOf(base.pow(retry).toLong() * 1000L, maxDelayMs)
+            val delay = minOf((base.pow(retry - 1) * baseDelayMs).toLong(), maxDelayMs)
             delay + randomMs(randomizationMs)
         }
     }
@@ -235,11 +256,12 @@ public val HttpRequestRetry: ClientPlugin<HttpRequestRetryConfig> = createClient
         maxRetries: Int,
         shouldRetry: HttpRetryShouldRetryContext.(HttpRequest, HttpResponse) -> Boolean,
         call: HttpClientCall
-    ) = retryCount < maxRetries && shouldRetry(
-        HttpRetryShouldRetryContext(retryCount + 1),
-        call.request,
-        call.response
-    )
+    ) = retryCount < maxRetries &&
+        shouldRetry(
+            HttpRetryShouldRetryContext(retryCount + 1),
+            call.request,
+            call.response
+        )
 
     fun shouldRetryOnException(
         retryCount: Int,
@@ -247,11 +269,12 @@ public val HttpRequestRetry: ClientPlugin<HttpRequestRetryConfig> = createClient
         shouldRetry: HttpRetryShouldRetryContext.(HttpRequestBuilder, Throwable) -> Boolean,
         subRequest: HttpRequestBuilder,
         cause: Throwable
-    ) = retryCount < maxRetries && shouldRetry(
-        HttpRetryShouldRetryContext(retryCount + 1),
-        subRequest,
-        cause
-    )
+    ) = retryCount < maxRetries &&
+        shouldRetry(
+            HttpRetryShouldRetryContext(retryCount + 1),
+            subRequest,
+            cause
+        )
 
     fun prepareRequest(request: HttpRequestBuilder): HttpRequestBuilder {
         val subRequest = HttpRequestBuilder().takeFrom(request)
@@ -259,7 +282,9 @@ public val HttpRequestRetry: ClientPlugin<HttpRequestRetryConfig> = createClient
             val subRequestJob = subRequest.executionContext as CompletableJob
             if (cause == null) {
                 subRequestJob.complete()
-            } else subRequestJob.completeExceptionally(cause)
+            } else {
+                subRequestJob.completeExceptionally(cause)
+            }
         }
         return subRequest
     }
@@ -290,6 +315,8 @@ public val HttpRequestRetry: ClientPlugin<HttpRequestRetryConfig> = createClient
                 }
                 call = proceed(subRequest)
                 if (!shouldRetry(retryCount, maxRetries, shouldRetry, call)) {
+                    // throws exception if body is corrupt
+                    call.response.throwOnInvalidResponseBody()
                     break
                 }
                 HttpRetryEventData(subRequest, ++retryCount, call.response, null)
@@ -400,4 +427,11 @@ private fun Throwable.isTimeoutException(): Boolean {
     return exception is HttpRequestTimeoutException ||
         exception is ConnectTimeoutException ||
         exception is SocketTimeoutException
+}
+
+@OptIn(InternalAPI::class)
+private suspend fun HttpResponse.throwOnInvalidResponseBody(): Boolean {
+    // wait for saved content to pass through intermediate processing
+    // if the encoding is wrong, then this will throw an exception
+    return isSaved && rawContent.awaitContent()
 }

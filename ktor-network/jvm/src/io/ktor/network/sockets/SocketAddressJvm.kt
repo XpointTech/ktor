@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2022 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
+ * Copyright 2014-2024 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
  */
 
 package io.ktor.network.sockets
@@ -45,9 +45,7 @@ public actual class InetSocketAddress internal constructor(
 
         other as InetSocketAddress
 
-        if (address != other.address) return false
-
-        return true
+        return address == other.address
     }
 
     actual override fun hashCode(): Int {
@@ -58,7 +56,8 @@ public actual class InetSocketAddress internal constructor(
 }
 
 public actual class UnixSocketAddress internal constructor(
-    override val address: java.net.SocketAddress // actually: java.net.UnixDomainSocketAddress
+    // actually: java.net.UnixDomainSocketAddress
+    override val address: java.net.SocketAddress
 ) : SocketAddress() {
 
     init {
@@ -93,9 +92,7 @@ public actual class UnixSocketAddress internal constructor(
 
         other as UnixSocketAddress
 
-        if (address != other.address) return false
-
-        return true
+        return address == other.address
     }
 
     actual override fun hashCode(): Int {

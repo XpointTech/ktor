@@ -4,6 +4,7 @@
 
 package io.ktor.utils.io
 
+import io.ktor.utils.io.core.*
 import kotlinx.io.*
 import kotlin.concurrent.*
 
@@ -12,7 +13,7 @@ internal class SourceByteReadChannel(private val source: Source) : ByteReadChann
     private var closed: CloseToken? = null
 
     override val closedCause: Throwable?
-        get() = closed?.cause
+        get() = closed?.wrapCause()
 
     override val isClosedForRead: Boolean
         get() = source.exhausted()
@@ -26,12 +27,12 @@ internal class SourceByteReadChannel(private val source: Source) : ByteReadChann
 
     override suspend fun awaitContent(min: Int): Boolean {
         closedCause?.let { throw it }
-        return false
+        return source.remaining >= min
     }
 
     override fun cancel(cause: Throwable?) {
         if (closed != null) return
         source.close()
-        closed = CloseToken(kotlinx.io.IOException(cause?.message ?: "Channel was cancelled", cause))
+        closed = CloseToken(IOException(cause?.message ?: "Channel was cancelled", cause))
     }
 }

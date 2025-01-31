@@ -4,17 +4,23 @@
 
 package io.ktor.server.http.content
 
+import com.sun.nio.file.SensitivityWatchEventModifier
 import io.ktor.http.*
 import io.ktor.http.content.*
 import io.ktor.server.application.*
 import io.ktor.server.application.hooks.*
+import io.ktor.server.http.content.FileSystemPaths.Companion.paths
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.util.*
-import java.io.*
-import java.net.*
-import java.nio.file.*
-import kotlin.io.path.*
+import java.io.File
+import java.net.URL
+import java.nio.file.FileSystem
+import java.nio.file.FileSystems
+import java.nio.file.Path
+import java.nio.file.StandardWatchEventKinds
+import kotlin.io.path.isDirectory
+import kotlin.io.path.pathString
 
 /**
  * Attribute to assign the path of a static file served in the response.  The main use of this attribute is to indicate
@@ -164,12 +170,12 @@ public class StaticContentConfig<Resource : Any> internal constructor() {
  *
  * You can use [block] for additional set up.
  */
-public fun Routing.staticFiles(
+public fun Route.staticFiles(
     remotePath: String,
     dir: File,
     index: String? = "index.html",
     block: StaticContentConfig<File>.() -> Unit = {}
-): Routing {
+): Route {
     val staticRoute = StaticContentConfig<File>().apply(block)
     val autoHead = staticRoute.autoHeadResponse
     val compressedTypes = staticRoute.preCompressedFileTypes
@@ -204,12 +210,12 @@ public fun Routing.staticFiles(
  *
  * You can use [block] for additional set up.
  */
-public fun Routing.staticResources(
+public fun Route.staticResources(
     remotePath: String,
     basePackage: String?,
     index: String? = "index.html",
     block: StaticContentConfig<URL>.() -> Unit = {}
-): Routing {
+): Route {
     val staticRoute = StaticContentConfig<URL>().apply(block)
     val autoHead = staticRoute.autoHeadResponse
     val compressedTypes = staticRoute.preCompressedFileTypes
@@ -244,19 +250,62 @@ public fun Routing.staticResources(
  *
  * You can use [block] for additional set up.
  */
-public fun Routing.staticZip(
+public fun Route.staticZip(
     remotePath: String,
     basePath: String?,
     zip: Path,
     index: String? = "index.html",
     block: StaticContentConfig<Path>.() -> Unit = {}
-): Routing = staticFileSystem(
+): Route = staticFileSystem(
     remotePath = remotePath,
     basePath = basePath,
     index = index,
-    fileSystem = FileSystems.newFileSystem(zip, environment.classLoader),
+    fileSystem = ReloadingZipFileSystem(
+        zip,
+        environment.classLoader,
+        getFileSystem(zip, environment.classLoader).paths()
+    ),
     block = block
 )
+
+private fun getFileSystem(zip: Path, classLoader: ClassLoader): FileSystem = FileSystems.newFileSystem(zip, classLoader)
+
+/**
+ * Allow to serve changing [FileSystem]. Returns [FileSystemPaths],
+ * which will be recreated on each request if there were any file changes.
+ */
+private class ReloadingZipFileSystem(
+    private val zip: Path,
+    private val classLoader: ClassLoader,
+    private var delegate: FileSystemPaths
+) : FileSystemPaths {
+    private val watchService = FileSystems.getDefault().newWatchService()
+
+    init {
+        zip.parent.register(
+            watchService,
+            arrayOf(
+                StandardWatchEventKinds.ENTRY_CREATE,
+                StandardWatchEventKinds.ENTRY_DELETE,
+                StandardWatchEventKinds.ENTRY_MODIFY,
+                StandardWatchEventKinds.OVERFLOW
+            ),
+            SensitivityWatchEventModifier.HIGH
+        )
+    }
+
+    override fun getPath(first: String, vararg more: String): Path {
+        val key = watchService.poll() ?: return delegate.getPath(first, *more)
+
+        val events = key.pollEvents()
+        if (events.isNotEmpty()) {
+            delegate = getFileSystem(zip, classLoader).paths()
+        }
+        key.reset()
+
+        return delegate.getPath(first, *more)
+    }
+}
 
 /**
  * Sets up [RoutingRoot] to serve [fileSystem] as static content.
@@ -268,13 +317,13 @@ public fun Routing.staticZip(
  *
  * You can use [block] for additional set up.
  */
-public fun Routing.staticFileSystem(
+public fun Route.staticFileSystem(
     remotePath: String,
     basePath: String?,
     index: String? = "index.html",
-    fileSystem: FileSystem = FileSystems.getDefault(),
+    fileSystem: FileSystemPaths = FileSystems.getDefault().paths(),
     block: StaticContentConfig<Path>.() -> Unit = {}
-): Routing {
+): Route {
     val staticRoute = StaticContentConfig<Path>().apply(block)
     val autoHead = staticRoute.autoHeadResponse
     val compressedTypes = staticRoute.preCompressedFileTypes
@@ -314,9 +363,9 @@ public fun Routing.staticFileSystem(
  *
  * * This can't be disabled in a child route if it was enabled in the root route
  */
-public fun Routing.preCompressed(
-    vararg types: CompressedFileType = CompressedFileType.values(),
-    configure: Routing.() -> Unit
+public fun Route.preCompressed(
+    vararg types: CompressedFileType = CompressedFileType.entries.toTypedArray(),
+    configure: Route.() -> Unit
 ) {
     val existing = staticContentEncodedTypes ?: emptyList()
     val mixedTypes = (existing + types.asList()).distinct()
@@ -328,7 +377,7 @@ public fun Routing.preCompressed(
 /**
  * Base folder for relative files calculations for static content
  */
-public var Routing.staticRootFolder: File?
+public var Route.staticRootFolder: File?
     get() = attributes.getOrNull(staticRootFolderKey) ?: parent?.staticRootFolder
     set(value) {
         if (value != null) {
@@ -347,27 +396,27 @@ private fun File?.combine(file: File) = when {
  * Create a block for static content
  */
 @Deprecated("Please use `staticFiles` or `staticResources` instead")
-public fun Routing.static(configure: Routing.() -> Unit): Routing = apply(configure)
+public fun Route.static(configure: Route.() -> Unit): Route = apply(configure)
 
 /**
  * Create a block for static content at specified [remotePath]
  */
 @Deprecated("Please use `staticFiles` or `staticResources` instead")
-public fun Routing.static(remotePath: String, configure: Routing.() -> Unit): Routing =
+public fun Route.static(remotePath: String, configure: Route.() -> Unit): Route =
     route(remotePath, configure)
 
 /**
  * Specifies [localPath] as a default file to serve when folder is requested
  */
-@Suppress("DEPRECATION")
+
 @Deprecated("Please use `staticFiles` instead")
-public fun Routing.default(localPath: String): Unit = default(File(localPath))
+public fun Route.default(localPath: String): Unit = default(File(localPath))
 
 /**
  * Specifies [localPath] as a default file to serve when folder is requested
  */
 @Deprecated("Please use `staticFiles` instead")
-public fun Routing.default(localPath: File) {
+public fun Route.default(localPath: File) {
     val file = staticRootFolder.combine(localPath)
     val compressedTypes = staticContentEncodedTypes
     get {
@@ -378,16 +427,16 @@ public fun Routing.default(localPath: File) {
 /**
  * Sets up routing to serve [localPath] file as [remotePath]
  */
-@Suppress("DEPRECATION")
+
 @Deprecated("Please use `staticFiles` instead")
-public fun Routing.file(remotePath: String, localPath: String = remotePath): Unit =
+public fun Route.file(remotePath: String, localPath: String = remotePath): Unit =
     file(remotePath, File(localPath))
 
 /**
  * Sets up routing to serve [localPath] file as [remotePath]
  */
 @Deprecated("Please use `staticFiles` instead")
-public fun Routing.file(remotePath: String, localPath: File) {
+public fun Route.file(remotePath: String, localPath: File) {
     val file = staticRootFolder.combine(localPath)
     val compressedTypes = staticContentEncodedTypes
     get(remotePath) {
@@ -398,15 +447,15 @@ public fun Routing.file(remotePath: String, localPath: File) {
 /**
  * Sets up routing to serve all files from [folder]
  */
-@Suppress("DEPRECATION")
+
 @Deprecated("Please use `staticFiles` instead")
-public fun Routing.files(folder: String): Unit = files(File(folder))
+public fun Route.files(folder: String): Unit = files(File(folder))
 
 /**
  * Sets up routing to serve all files from [folder]
  */
 @Deprecated("Please use `staticFiles` instead")
-public fun Routing.files(folder: File) {
+public fun Route.files(folder: File) {
     val dir = staticRootFolder.combine(folder)
     val compressedTypes = staticContentEncodedTypes
     get("{$pathParameterName...}") {
@@ -421,9 +470,9 @@ private val staticBasePackageName = AttributeKey<String>("BasePackage")
 /**
  * Base package for relative resources calculations for static content
  */
-@Suppress("DEPRECATION")
+
 @Deprecated("Please use `staticResources` instead")
-public var Routing.staticBasePackage: String?
+public var Route.staticBasePackage: String?
     get() = attributes.getOrNull(staticBasePackageName) ?: parent?.staticBasePackage
     set(value) {
         if (value != null) {
@@ -442,9 +491,9 @@ private fun String?.combinePackage(resourcePackage: String?) = when {
 /**
  * Sets up routing to serve [resource] as [remotePath] in [resourcePackage]
  */
-@Suppress("DEPRECATION")
+
 @Deprecated("Please use `staticResources` instead")
-public fun Routing.resource(remotePath: String, resource: String = remotePath, resourcePackage: String? = null) {
+public fun Route.resource(remotePath: String, resource: String = remotePath, resourcePackage: String? = null) {
     val compressedTypes = staticContentEncodedTypes
     val packageName = staticBasePackage.combinePackage(resourcePackage)
     get(remotePath) {
@@ -459,9 +508,9 @@ public fun Routing.resource(remotePath: String, resource: String = remotePath, r
 /**
  * Sets up routing to serve all resources in [resourcePackage]
  */
-@Suppress("DEPRECATION")
+
 @Deprecated("Please use `staticResources` instead")
-public fun Routing.resources(resourcePackage: String? = null) {
+public fun Route.resources(resourcePackage: String? = null) {
     val packageName = staticBasePackage.combinePackage(resourcePackage)
     val compressedTypes = staticContentEncodedTypes
     get("{$pathParameterName...}") {
@@ -477,9 +526,9 @@ public fun Routing.resources(resourcePackage: String? = null) {
 /**
  * Specifies [resource] as a default resources to serve when folder is requested
  */
-@Suppress("DEPRECATION")
+
 @Deprecated("Please use `staticResources` instead")
-public fun Routing.defaultResource(resource: String, resourcePackage: String? = null) {
+public fun Route.defaultResource(resource: String, resourcePackage: String? = null) {
     val packageName = staticBasePackage.combinePackage(resourcePackage)
     val compressedTypes = staticContentEncodedTypes
     get {
@@ -496,7 +545,7 @@ public fun Routing.defaultResource(resource: String, resourcePackage: String? = 
  */
 public fun ApplicationCall.isStaticContent(): Boolean = attributes.contains(StaticFileLocationProperty)
 
-private fun Routing.staticContentRoute(
+private fun Route.staticContentRoute(
     remotePath: String,
     autoHead: Boolean,
     handler: suspend (ApplicationCall).() -> Unit
@@ -559,7 +608,7 @@ private suspend fun ApplicationCall.respondStaticFile(
 }
 
 private suspend fun ApplicationCall.respondStaticPath(
-    fileSystem: FileSystem,
+    fileSystem: FileSystemPaths,
     index: String?,
     basePath: String?,
     compressedTypes: List<CompressedFileType>?,
@@ -571,7 +620,7 @@ private suspend fun ApplicationCall.respondStaticPath(
     defaultPath: String?
 ) {
     val relativePath = parameters.getAll(pathParameterName)?.joinToString(File.separator) ?: return
-    val requestedPath = fileSystem.getPath(basePath ?: "").combineSafe(fileSystem.getPath(relativePath))
+    val requestedPath = fileSystem.getPath(basePath.orEmpty()).combineSafe(fileSystem.getPath(relativePath))
 
     suspend fun checkExclude(path: Path): Boolean {
         if (!exclude(path)) return false
@@ -665,4 +714,24 @@ private suspend fun ApplicationCall.respondStaticResource(
         cacheControl = cacheControl,
         modifier = modifier
     )
+}
+
+/**
+ * Wrapper on [FileSystem] for more specific delegation since we use only [getPath] method from it.
+ */
+public interface FileSystemPaths {
+    public companion object {
+        /**
+         * Creates a [FileSystemPaths] instance from a [FileSystem].
+         */
+        public fun FileSystem.paths(): FileSystemPaths = object : FileSystemPaths {
+            override fun getPath(first: String, vararg more: String): Path = this@paths.getPath(first, *more)
+        }
+    }
+
+    /**
+     * Converts a path string, or a sequence of strings that when joined form a path string, to a Path.
+     * Equal to [FileSystem.getPath].
+     */
+    public fun getPath(first: String, vararg more: String): Path
 }

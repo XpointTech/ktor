@@ -1,9 +1,12 @@
+/*
+ * Copyright 2014-2024 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
+ */
+
 package io.ktor.utils.io.charsets
 
 import io.ktor.utils.io.core.*
 import io.ktor.utils.io.core.internal.*
 import kotlinx.io.*
-import kotlinx.io.IOException
 
 public expect abstract class Charset {
     public abstract fun newEncoder(): CharsetEncoder
@@ -40,16 +43,14 @@ public expect fun CharsetEncoder.encodeToByteArray(
     toIndex: Int = input.length
 ): ByteArray
 
-@Suppress("DEPRECATION")
 public fun CharsetEncoder.encode(
     input: CharSequence,
     fromIndex: Int = 0,
     toIndex: Int = input.length
-): ByteReadPacket = buildPacket {
+): Source = buildPacket {
     encodeToImpl(this, input, fromIndex, toIndex)
 }
 
-@Suppress("DEPRECATION")
 public fun CharsetEncoder.encode(input: CharArray, fromIndex: Int, toIndex: Int, dst: Sink) {
     encodeArrayImpl(input, fromIndex, toIndex, dst)
 }

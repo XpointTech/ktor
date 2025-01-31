@@ -24,10 +24,8 @@ internal abstract class NIOSocketImpl<out S>(
 
     private val closeFlag = AtomicBoolean()
 
-    @Suppress("DEPRECATION")
     private val readerJob = AtomicReference<ReaderJob?>()
 
-    @Suppress("DEPRECATION")
     private val writerJob = AtomicReference<WriterJob?>()
 
     override val socketContext: CompletableJob = Job()
@@ -41,7 +39,6 @@ internal abstract class NIOSocketImpl<out S>(
     //  that will cause broken data
     // however it is not the case for attachForWriting this is why we use direct writing in any case
 
-    @Suppress("DEPRECATION")
     final override fun attachForReading(channel: ByteChannel): WriterJob {
         return attachFor("reading", channel, writerJob) {
             if (pool != null) {
@@ -52,7 +49,6 @@ internal abstract class NIOSocketImpl<out S>(
         }
     }
 
-    @Suppress("DEPRECATION")
     final override fun attachForWriting(channel: ByteChannel): ReaderJob {
         return attachFor("writing", channel, readerJob) {
             attachForWritingDirectImpl(channel, this.channel, this, selector, socketOptions)
@@ -63,16 +59,13 @@ internal abstract class NIOSocketImpl<out S>(
         close()
     }
 
-    @Suppress("DEPRECATION")
     override fun close() {
         if (!closeFlag.compareAndSet(false, true)) return
 
-        readerJob.get()?.channel?.close()
         writerJob.get()?.cancel()
         checkChannels()
     }
 
-    @Suppress("DEPRECATION")
     private fun <J : ChannelJob> attachFor(
         name: String,
         channel: ByteChannel,
@@ -145,7 +138,6 @@ internal abstract class NIOSocketImpl<out S>(
     private val AtomicReference<out ChannelJob?>.completedOrNotStarted: Boolean
         get() = get().let { it == null || it.isCompleted }
 
-    @OptIn(InternalCoroutinesApi::class)
     private val AtomicReference<out ChannelJob?>.exception: Throwable?
         get() = get()?.takeIf { it.isCancelled }
             ?.getCancellationException()?.cause // TODO it should be completable deferred or provide its own exception

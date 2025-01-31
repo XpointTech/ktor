@@ -1,8 +1,13 @@
+/*
+ * Copyright 2014-2025 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
+ */
+
 apply plugin: 'binary-compatibility-validator'
 
 apiValidation {
     def excludeList = [
         'ktor',
+        "ktor-client-test-base",
         'ktor-client-tests',
         'ktor-client-js',
         'ktor-client-content-negotiation-tests',
@@ -12,18 +17,8 @@ apiValidation {
         'ktor-client-plugins',
         'ktor-server-test-suites',
         "ktor-server-test-base",
-        'ktor-junit',
+        'ktor-test-base',
     ].toSet()
-
-    if (rootProject.ext.native_targets_enabled) {
-        excludeList += [
-            'ktor-client-curl',
-            'ktor-client-ios',
-            'ktor-client-darwin',
-            'ktor-client-darwin-legacy',
-            'ktor-client-winhttp',
-        ]
-    }
 
     def projects = [].toSet()
     def queue = [
@@ -48,4 +43,8 @@ apiValidation {
 
     ignoredProjects += excludeList
     ignoredProjects += project.allprojects.collect { it.name }.findAll { !projectNames.contains(it) }
+
+    klib {
+        enabled = true
+    }
 }

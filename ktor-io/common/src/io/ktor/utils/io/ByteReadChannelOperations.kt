@@ -6,18 +6,32 @@
 
 package io.ktor.utils.io
 
+import io.ktor.utils.io.charsets.*
 import io.ktor.utils.io.core.*
 import kotlinx.coroutines.*
 import kotlinx.io.*
 import kotlinx.io.Buffer
+import kotlinx.io.bytestring.*
 import kotlinx.io.unsafe.*
 import kotlin.coroutines.*
-import kotlin.jvm.*
 import kotlin.math.*
 
 @OptIn(InternalAPI::class)
 public val ByteWriteChannel.availableForWrite: Int
     get() = CHANNEL_MAX_SIZE - writeBuffer.size
+
+/**
+ * Suspends the channel until it is exhausted or gets closed.
+ * If the read buffer is empty, it suspends until there are bytes available in the channel.
+ * Once the channel is exhausted or closed, this function returns.
+ *
+ * @return `true` if the channel is exhausted, `false` if EOF is reached or an error occurred.
+ */
+@OptIn(InternalAPI::class)
+public suspend fun ByteReadChannel.exhausted(): Boolean {
+    if (readBuffer.exhausted()) awaitContent()
+    return readBuffer.exhausted()
+}
 
 public suspend fun ByteReadChannel.toByteArray(): ByteArray {
     return readBuffer().readBytes()
@@ -36,27 +50,48 @@ public suspend fun ByteReadChannel.readByte(): Byte {
     return readBuffer.readByte()
 }
 
+@OptIn(InternalAPI::class)
 public suspend fun ByteReadChannel.readShort(): Short {
-    TODO("Not yet implemented")
+    awaitUntilReadable(Short.SIZE_BYTES)
+    return readBuffer.readShort()
 }
 
 @OptIn(InternalAPI::class)
 public suspend fun ByteReadChannel.readInt(): Int {
-    while (availableForRead < 4 && awaitContent()) {
-    }
-
-    if (availableForRead < 4) throw EOFException("Not enough data available")
-
+    awaitUntilReadable(Int.SIZE_BYTES)
     return readBuffer.readInt()
+}
+
+/**
+ * Reads a 32-bit floating-point value from the current [ByteReadChannel].
+ */
+@OptIn(InternalAPI::class)
+public suspend fun ByteReadChannel.readFloat(): Float {
+    awaitUntilReadable(Float.SIZE_BYTES)
+    return readBuffer.readFloat()
 }
 
 @OptIn(InternalAPI::class)
 public suspend fun ByteReadChannel.readLong(): Long {
-    while (availableForRead < 8 && awaitContent()) {
+    awaitUntilReadable(Long.SIZE_BYTES)
+    return readBuffer.readLong()
+}
+
+/**
+ * Reads a 32-bit floating-point value from the current [ByteReadChannel].
+ */
+@OptIn(InternalAPI::class)
+public suspend fun ByteReadChannel.readDouble(): Double {
+    awaitUntilReadable(Double.SIZE_BYTES)
+    return readBuffer.readDouble()
+}
+
+private suspend fun ByteReadChannel.awaitUntilReadable(numberOfBytes: Int) {
+    while (availableForRead < numberOfBytes && awaitContent(numberOfBytes)) {
+        yield()
     }
 
-    if (availableForRead < 8) throw EOFException("Not enough data available")
-    return readBuffer.readLong()
+    if (availableForRead < numberOfBytes) throw EOFException("Not enough data available")
 }
 
 @OptIn(InternalAPI::class)
@@ -89,17 +124,13 @@ public suspend fun ByteReadChannel.readBuffer(max: Int): Buffer {
 }
 
 @OptIn(InternalAPI::class)
-public suspend fun ByteReadChannel.copyAndClose(channel: ByteWriteChannel, limit: Long = Long.MAX_VALUE): Long {
+public suspend fun ByteReadChannel.copyAndClose(channel: ByteWriteChannel): Long {
     var result = 0L
     try {
-        if (limit == Long.MAX_VALUE) {
-            while (!isClosedForRead) {
-                result += readBuffer.transferTo(channel.writeBuffer)
-                channel.flush()
-                awaitContent()
-            }
-        } else {
-            TODO()
+        while (!isClosedForRead) {
+            result += readBuffer.transferTo(channel.writeBuffer)
+            channel.flush()
+            awaitContent()
         }
 
         closedCause?.let { throw it }
@@ -114,10 +145,17 @@ public suspend fun ByteReadChannel.copyAndClose(channel: ByteWriteChannel, limit
     return result
 }
 
-@OptIn(InternalAPI::class)
-public suspend fun ByteReadChannel.readUTF8Line(): String? {
+/**
+ * Reads a line of UTF-8 characters from the `ByteReadChannel`.
+ * It recognizes CR, LF and CRLF as line delimiters.
+ *
+ * @param max the maximum number of characters to read. Default is [Int.MAX_VALUE].
+ * @return a string containing the line read, or null if channel is closed
+ * @throws TooLongLineException if max is reached before encountering a newline or end of input
+ */
+public suspend fun ByteReadChannel.readUTF8Line(max: Int = Int.MAX_VALUE): String? {
     val result = StringBuilder()
-    val completed = readUTF8LineTo(result)
+    val completed = readUTF8LineTo(result, max)
     return if (!completed) null else result.toString()
 }
 
@@ -163,10 +201,6 @@ public suspend fun ByteReadChannel.copyTo(channel: ByteWriteChannel, limit: Long
     return limit - remaining
 }
 
-public fun ByteReadChannel.split(): Pair<ByteReadChannel, ByteReadChannel> {
-    TODO("Not yet implemented")
-}
-
 public suspend fun ByteReadChannel.readByteArray(count: Int): ByteArray = buildPacket {
     while (size < count) {
         val packet = readPacket(count - size)
@@ -174,9 +208,8 @@ public suspend fun ByteReadChannel.readByteArray(count: Int): ByteArray = buildP
     }
 }.readByteArray()
 
-@Suppress("DEPRECATION")
 @OptIn(InternalAPI::class, InternalIoApi::class)
-public suspend fun ByteReadChannel.readRemaining(): ByteReadPacket {
+public suspend fun ByteReadChannel.readRemaining(): Source {
     val result = BytePacketBuilder()
     while (!isClosedForRead) {
         result.transferFrom(readBuffer)
@@ -188,7 +221,7 @@ public suspend fun ByteReadChannel.readRemaining(): ByteReadPacket {
 }
 
 @OptIn(InternalAPI::class, InternalIoApi::class)
-public suspend fun ByteReadChannel.readRemaining(max: Long): ByteReadPacket {
+public suspend fun ByteReadChannel.readRemaining(max: Long): Source {
     val result = BytePacketBuilder()
     var remaining = max
     while (!isClosedForRead && remaining > 0) {
@@ -293,7 +326,7 @@ public fun CoroutineScope.reader(
         }
     }
 
-    return ReaderJob(channel, job)
+    return ReaderJob(channel.onClose { job.join() }, job)
 }
 
 /**
@@ -301,9 +334,8 @@ public fun CoroutineScope.reader(
  *
  * @throws EOFException if the channel is closed before the packet is fully read.
  */
-@Suppress("DEPRECATION")
 @OptIn(InternalAPI::class)
-public suspend fun ByteReadChannel.readPacket(packet: Int): ByteReadPacket {
+public suspend fun ByteReadChannel.readPacket(packet: Int): Source {
     val result = Buffer()
     while (result.size < packet) {
         if (readBuffer.exhausted()) awaitContent()
@@ -342,6 +374,9 @@ public suspend fun ByteReadChannel.discard(max: Long = Long.MAX_VALUE): Long {
     return max - remaining
 }
 
+private const val CR: Byte = '\r'.code.toByte()
+private const val LF: Byte = '\n'.code.toByte()
+
 /**
  * Reads a line of UTF-8 characters to the specified [out] buffer.
  * It recognizes CR, LF and CRLF as a line delimiter.
@@ -350,68 +385,48 @@ public suspend fun ByteReadChannel.discard(max: Long = Long.MAX_VALUE): Long {
  * @param max the maximum number of characters to read
  *
  * @return `true` if a new line separator was found or max bytes appended. `false` if no new line separator and no bytes read.
+ * @throws TooLongLineException if max is reached before encountering a newline or end of input
  */
 @OptIn(InternalAPI::class, InternalIoApi::class)
 public suspend fun ByteReadChannel.readUTF8LineTo(out: Appendable, max: Int = Int.MAX_VALUE): Boolean {
     if (readBuffer.exhausted()) awaitContent()
     if (isClosedForRead) return false
 
-    var consumed = 0
-    while (!isClosedForRead) {
-        awaitContent()
+    Buffer().use { lineBuffer ->
+        while (!isClosedForRead) {
+            while (!readBuffer.exhausted()) {
+                when (val b = readBuffer.readByte()) {
+                    CR -> {
+                        // Check if LF follows CR after awaiting
+                        if (readBuffer.exhausted()) awaitContent()
+                        if (readBuffer.buffer[0] == LF) {
+                            readBuffer.discard(1)
+                        }
+                        out.append(lineBuffer.readString())
+                        return true
+                    }
 
-        val cr = readBuffer.indexOf('\r'.code.toByte())
-        val lf = readBuffer.indexOf('\n'.code.toByte())
+                    LF -> {
+                        out.append(lineBuffer.readString())
+                        return true
+                    }
 
-        // No new line separator
-        if (cr == -1L && lf == -1L) {
-            if (max == Int.MAX_VALUE) {
-                val value = readBuffer.readString()
-                out.append(value)
-            } else {
-                val count = minOf(max - consumed, readBuffer.remaining.toInt())
-                consumed += count
-                out.append(readBuffer.readString(count.toLong()))
-
-                if (consumed == max) return true
+                    else -> lineBuffer.writeByte(b)
+                }
+            }
+            if (lineBuffer.size >= max) {
+                throw TooLongLineException("Line exceeds limit of $max characters")
             }
 
-            continue
+            awaitContent()
         }
 
-        // CRLF fully in buffer
-        if (cr >= 0 && lf == cr + 1) {
-            val count = if (max != Int.MAX_VALUE) cr else minOf(max - consumed, cr.toInt()).toLong()
-            out.append(readBuffer.readString(count))
-            if (count == cr) readBuffer.discard(2)
-            return true
-        }
-
-        // CR in buffer before LF
-        if (cr >= 0 && (lf == -1L || cr < lf)) {
-            val count = if (max != Int.MAX_VALUE) cr else minOf(max - consumed, cr.toInt()).toLong()
-            out.append(readBuffer.readString(count))
-            if (count == cr) readBuffer.discard(1)
-
-            // Check if LF follows CR after awaiting
-            if (readBuffer.exhausted()) awaitContent()
-            if (readBuffer.buffer[0] == '\n'.code.toByte()) {
-                readBuffer.discard(1)
+        return (lineBuffer.size > 0).also { remaining ->
+            if (remaining) {
+                out.append(lineBuffer.readString())
             }
-
-            return true
-        }
-
-        // LF in buffer before CR
-        if (lf >= 0) {
-            val count = if (max != Int.MAX_VALUE) lf else minOf(max - consumed, lf.toInt()).toLong()
-            out.append(readBuffer.readString(count))
-            if (count == lf) readBuffer.discard(1)
-            return true
         }
     }
-
-    return true
 }
 
 @OptIn(InternalAPI::class, UnsafeIoApi::class, InternalIoApi::class)
@@ -420,7 +435,7 @@ public suspend inline fun ByteReadChannel.read(crossinline block: suspend (ByteA
     if (readBuffer.exhausted()) awaitContent()
     if (isClosedForRead) return -1
 
-    var result = 0
+    var result: Int
     UnsafeBufferOperations.readFromHead(readBuffer.buffer) { array, start, endExclusive ->
         result = block(array, start, endExclusive)
         result
@@ -434,19 +449,24 @@ public val ByteReadChannel.availableForRead: Int
     get() = readBuffer.buffer.size.toInt()
 
 /**
- * Reads all [length] bytes to [dst] buffer or fails if channel has been closed.
- * Suspends if not enough bytes available.
+ * Reads bytes from [start] to [end] into the provided [out] buffer, or fails
+ * if the channel has been closed.
+ *
+ * Suspension occurs when there are not enough bytes available in the channel.
+ *
+ * @param out the buffer to write to
+ * @param start the index to start writing at
+ * @param end the index to write until
  */
 @OptIn(InternalAPI::class)
-public suspend fun ByteReadChannel.readFully(out: ByteArray) {
-    if (isClosedForRead) throw EOFException("Channel is already closed")
-
-    var offset = 0
-    while (offset < out.size) {
+public suspend fun ByteReadChannel.readFully(out: ByteArray, start: Int = 0, end: Int = out.size) {
+    if (end > start && isClosedForRead) throw EOFException("Channel is already closed")
+    var offset = start
+    while (offset < end) {
         if (readBuffer.exhausted()) awaitContent()
         if (isClosedForRead) throw EOFException("Channel is already closed")
 
-        val count = min(out.size - offset, readBuffer.remaining.toInt())
+        val count = min(end - offset, readBuffer.remaining.toInt())
         readBuffer.readTo(out, offset, offset + count)
         offset += count
     }
@@ -465,4 +485,127 @@ public fun ByteWriteChannel.rethrowCloseCauseIfNeeded() {
 @InternalAPI
 public fun ByteChannel.rethrowCloseCauseIfNeeded() {
     closedCause?.let { throw it }
+}
+
+/**
+ * Reads bytes from the ByteReadChannel until a specified sequence of bytes is encountered or the specified limit is reached.
+ *
+ * This uses the KMP algorithm for finding the string match using a partial match table.
+ *
+ * @see [Knuth–Morris–Pratt algorithm](https://en.wikipedia.org/wiki/Knuth%E2%80%93Morris%E2%80%93Pratt_algorithm)
+ * @param matchString The sequence of bytes to look for.
+ * @param writeChannel The channel to write the read bytes to.
+ * @param limit The maximum number of bytes to read before throwing an exception.
+ * @param ignoreMissing Whether to ignore the missing byteString and return the count of read bytes upon reaching the end of input.
+ * @return The number of bytes read, not including the search string.
+ * @throws IOException If the limit is exceeded or the byteString is not found and ignoreMissing is false.
+ */
+public suspend fun ByteReadChannel.readUntil(
+    matchString: ByteString,
+    writeChannel: ByteWriteChannel,
+    limit: Long = Long.MAX_VALUE,
+    ignoreMissing: Boolean = false,
+): Long {
+    check(matchString.size > 0) {
+        "Empty match string not permitted for readUntil"
+    }
+    val partialMatchTable = buildPartialMatchTable(matchString)
+    var matchIndex = 0
+    val matchBuffer = ByteArray(matchString.size)
+    var rc = 0L
+
+    suspend fun appendPartialMatch() {
+        writeChannel.writeFully(matchBuffer, 0, matchIndex)
+        rc += matchIndex
+        matchIndex = 0
+    }
+
+    fun resetPartialMatch(byte: Byte) {
+        while (matchIndex > 0 && byte != matchString[matchIndex]) {
+            matchIndex = partialMatchTable[matchIndex - 1]
+        }
+    }
+
+    while (!isClosedForRead) {
+        val byte = readByte()
+
+        if (matchIndex > 0 && byte != matchString[matchIndex]) {
+            appendPartialMatch()
+            resetPartialMatch(byte)
+        }
+
+        if (byte == matchString[matchIndex]) {
+            matchBuffer[matchIndex] = byte
+            if (++matchIndex == matchString.size) {
+                return rc
+            }
+        } else {
+            writeChannel.writeByte(byte)
+            rc++
+        }
+
+        if (rc > limit) {
+            throw IOException("Limit of $limit bytes exceeded while scanning for \"${matchString.decodeToString()}\"")
+        }
+    }
+
+    if (ignoreMissing) {
+        appendPartialMatch()
+        writeChannel.flush()
+        return rc
+    }
+
+    throw IOException("Expected \"${matchString.toSingleLineString()}\" but encountered end of input")
+}
+
+/**
+ * Helper function to build the partial match table (also known as "longest prefix suffix" table)
+ */
+private fun buildPartialMatchTable(byteString: ByteString): IntArray {
+    val table = IntArray(byteString.size)
+    var j = 0
+
+    for (i in 1 until byteString.size) {
+        while (j > 0 && byteString[i] != byteString[j]) {
+            j = table[j - 1]
+        }
+        if (byteString[i] == byteString[j]) {
+            j++
+        }
+        table[i] = j
+    }
+
+    return table
+}
+
+// Used in formatting errors
+private fun ByteString.toSingleLineString() =
+    decodeToString().replace("\n", "\\n")
+
+/**
+ * Skips the specified [byteString] in the ByteReadChannel if it is found at the current position.
+ *
+ * @param byteString The ByteString to look for and skip if found.
+ * @return Returns `true` if the byteString was found and skipped, otherwise returns `false`.
+ */
+public suspend fun ByteReadChannel.skipIfFound(byteString: ByteString): Boolean {
+    if (peek(byteString.size) == byteString) {
+        discard(byteString.size.toLong())
+        return true
+    }
+    return false
+}
+
+/**
+ * Retrieves, but does not consume, up to the specified number of bytes from the current position in this
+ * [ByteReadChannel].
+ *
+ * @param count The number of bytes to peek.
+ * @return A [ByteString] containing the bytes that were peeked, or null if unable to peek the specified number of bytes.
+ */
+@OptIn(InternalAPI::class)
+public suspend fun ByteReadChannel.peek(count: Int): ByteString? {
+    if (isClosedForRead) return null
+    if (!awaitContent(count)) return null
+    return readBuffer.peek().readByteString(count)
 }

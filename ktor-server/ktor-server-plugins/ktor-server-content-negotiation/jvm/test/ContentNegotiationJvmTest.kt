@@ -1,6 +1,7 @@
 /*
- * Copyright 2014-2023 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
+ * Copyright 2014-2024 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
  */
+
 package io.ktor.server.plugins.contentnegotiation
 
 import io.ktor.client.request.*
@@ -16,11 +17,10 @@ import io.ktor.server.testing.*
 import io.ktor.util.reflect.*
 import io.ktor.utils.io.*
 import io.ktor.utils.io.charsets.*
-import io.ktor.utils.io.core.*
 import kotlinx.coroutines.*
+import kotlinx.io.*
 import java.io.*
 import kotlin.test.*
-import kotlin.text.toByteArray
 
 class ContentNegotiationJvmTest {
     private val alwaysFailingConverter = object : ContentConverter {
@@ -39,7 +39,7 @@ class ContentNegotiationJvmTest {
     }
 
     @Test
-    fun testReceiveInputStreamTransformedByDefault(): Unit = testApplication {
+    fun testReceiveInputStreamTransformedByDefault() = testApplication {
         application {
             install(ContentNegotiation) {
                 // Order here matters. The first registered content type matching the Accept header will be chosen.
@@ -53,8 +53,11 @@ class ContentNegotiationJvmTest {
                 }
                 post("/multipart") {
                     val multipart = call.receiveMultipart()
+                    val parts = mutableListOf<PartData>()
+                    multipart.forEachPart {
+                        parts.add(it)
+                    }
 
-                    @Suppress("DEPRECATION") val parts = multipart.readAllParts()
                     call.respondText("parts: ${parts.map { it.name }}")
                 }
             }
@@ -109,7 +112,6 @@ class ContentNegotiationJvmTest {
 }
 
 @OptIn(DelicateCoroutinesApi::class)
-@Suppress("DEPRECATION")
 internal fun buildMultipart(
     boundary: String,
     parts: List<PartData>
@@ -127,11 +129,11 @@ internal fun buildMultipart(
             append(
                 when (it) {
                     is PartData.FileItem -> {
-                        channel.writeFully(it.provider().readRemaining().readBytes())
+                        channel.writeFully(it.provider().readRemaining().readByteArray())
                         ""
                     }
                     is PartData.BinaryItem -> {
-                        channel.writeFully(it.provider().readBytes())
+                        channel.writeFully(it.provider().readByteArray())
                         ""
                     }
                     is PartData.FormItem -> it.value

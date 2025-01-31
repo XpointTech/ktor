@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2019 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
+ * Copyright 2014-2024 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
  */
 
 package io.ktor.client.plugins.auth.providers
@@ -21,14 +21,13 @@ import kotlinx.atomicfu.*
 public fun AuthConfig.digest(block: DigestAuthConfig.() -> Unit) {
     val config = DigestAuthConfig().apply(block)
     with(config) {
-        this@digest.providers += DigestAuthProvider(_credentials, realm, algorithmName)
+        this@digest.providers += DigestAuthProvider(credentials, realm, algorithmName)
     }
 }
 
 /**
  * A configuration for [DigestAuthProvider].
  */
-@Suppress("KDocMissingDocumentation")
 @KtorDsl
 public class DigestAuthConfig {
 
@@ -52,7 +51,7 @@ public class DigestAuthConfig {
     public var realm: String? = null
 
     @Suppress("DEPRECATION_ERROR")
-    internal var _credentials: suspend () -> DigestAuthCredentials? = {
+    internal var credentials: suspend () -> DigestAuthCredentials? = {
         DigestAuthCredentials(username = username, password = password)
     }
 
@@ -60,7 +59,7 @@ public class DigestAuthConfig {
      * Allows you to specify authentication credentials.
      */
     public fun credentials(block: suspend () -> DigestAuthCredentials?) {
-        _credentials = block
+        credentials = block
     }
 }
 
@@ -77,7 +76,6 @@ public class DigestAuthCredentials(
  *
  * You can learn more from [Digest authentication](https://ktor.io/docs/digest-client.html).
  */
-@Suppress("KDocMissingDocumentation")
 public class DigestAuthProvider(
     private val credentials: suspend () -> DigestAuthCredentials?,
     @Deprecated("This will become private", level = DeprecationLevel.ERROR) public val realm: String? = null,
@@ -113,7 +111,6 @@ public class DigestAuthProvider(
 
     override fun sendWithoutRequest(request: HttpRequestBuilder): Boolean = false
 
-    @Suppress("DEPRECATION")
     override fun isApplicable(auth: HttpAuthHeader): Boolean {
         if (auth !is HttpAuthHeader.Parameterized || auth.authScheme != AuthScheme.Digest) {
             LOGGER.trace("Digest Auth Provider is not applicable for $auth")
@@ -144,9 +141,8 @@ public class DigestAuthProvider(
         return true
     }
 
-    @Suppress("DEPRECATION")
     override suspend fun addRequestHeaders(request: HttpRequestBuilder, authHeader: HttpAuthHeader?) {
-        val nonceCount = requestCounter.incrementAndGet()
+        val nonceCount = requestCounter.incrementAndGet().toString(radix = 16).padStart(length = 8, padChar = '0')
         val methodName = request.method.value.uppercase()
         val url = URLBuilder().takeFrom(request.url).build()
 
@@ -173,20 +169,21 @@ public class DigestAuthProvider(
         val token = makeDigest(tokenSequence.joinToString(":"))
 
         val auth = HttpAuthHeader.Parameterized(
-            AuthScheme.Digest,
-            linkedMapOf<String, String>().apply {
-                realm?.let { this["realm"] = it }
-                serverOpaque?.let { this["opaque"] = it }
-                this["username"] = credentials.username
-                this["nonce"] = nonce
-                this["cnonce"] = clientNonce
-                this["response"] = hex(token)
-                this["uri"] = url.fullPath
+            authScheme = AuthScheme.Digest,
+            parameters = linkedMapOf<String, String>().apply {
+                realm?.let { this["realm"] = it.quote() }
+                serverOpaque?.let { this["opaque"] = it.quote() }
+                this["username"] = credentials.username.quote()
+                this["nonce"] = nonce.quote()
+                this["cnonce"] = clientNonce.quote()
+                this["response"] = hex(token).quote()
+                this["uri"] = url.fullPath.quote()
                 actualQop?.let { this["qop"] = it }
-                this["nc"] = nonceCount.toString()
+                this["nc"] = nonceCount
                 @Suppress("DEPRECATION_ERROR")
                 this["algorithm"] = algorithmName
-            }
+            },
+            encoding = HeaderValueEncoding.QUOTED_WHEN_REQUIRED
         )
 
         request.headers {

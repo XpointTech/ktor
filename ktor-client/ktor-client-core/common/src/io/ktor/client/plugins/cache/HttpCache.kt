@@ -21,7 +21,7 @@ import io.ktor.util.date.*
 import io.ktor.util.logging.*
 import io.ktor.util.pipeline.*
 import io.ktor.utils.io.*
-import kotlin.coroutines.*
+import kotlin.coroutines.CoroutineContext
 
 internal object CacheControl {
     internal val NO_STORE = HeaderValue("no-store")
@@ -41,16 +41,18 @@ internal val LOGGER = KtorSimpleLogger("io.ktor.client.plugins.HttpCache")
  * You can learn more from [Caching](https://ktor.io/docs/client-caching.html).
  */
 public class HttpCache private constructor(
-    @Deprecated("This will become internal", level = DeprecationLevel.ERROR)
-    @Suppress("DEPRECATION_ERROR")
-    internal val publicStorage: HttpCacheStorage,
-    @Deprecated("This will become internal", level = DeprecationLevel.ERROR)
-    @Suppress("DEPRECATION_ERROR")
-    internal val privateStorage: HttpCacheStorage,
+    @Deprecated(
+        "This will become internal",
+        level = DeprecationLevel.ERROR
+    ) @Suppress("DEPRECATION_ERROR") internal val publicStorage: HttpCacheStorage,
+    @Deprecated(
+        "This will become internal",
+        level = DeprecationLevel.ERROR
+    ) @Suppress("DEPRECATION_ERROR") internal val privateStorage: HttpCacheStorage,
     private val publicStorageNew: CacheStorage,
     private val privateStorageNew: CacheStorage,
     private val useOldStorage: Boolean,
-    internal val isSharedClient: Boolean
+    internal val isSharedClient: Boolean,
 ) {
     /**
      * A configuration for the [HttpCache] plugin.
@@ -131,8 +133,7 @@ public class HttpCache private constructor(
             val config = Config().apply(block)
 
             with(config) {
-                @Suppress("DEPRECATION_ERROR")
-                return HttpCache(
+                @Suppress("DEPRECATION_ERROR") return HttpCache(
                     publicStorage = publicStorage,
                     privateStorage = privateStorage,
                     publicStorageNew = publicStorageNew,
@@ -143,14 +144,17 @@ public class HttpCache private constructor(
             }
         }
 
-        @OptIn(InternalAPI::class)
         override fun install(plugin: HttpCache, scope: HttpClient) {
-            val CachePhase = PipelinePhase("Cache")
-            scope.sendPipeline.insertPhaseAfter(HttpSendPipeline.State, CachePhase)
+            val cacheRequestPhase = PipelinePhase("Cache")
+            scope.sendPipeline.insertPhaseAfter(HttpSendPipeline.State, cacheRequestPhase)
 
-            scope.sendPipeline.intercept(CachePhase) { content ->
+            scope.sendPipeline.intercept(cacheRequestPhase) { content ->
                 if (content !is OutgoingContent.NoContent) return@intercept
                 if (context.method != HttpMethod.Get || !context.url.protocol.canStore()) return@intercept
+
+                if (plugin.isSharedClient && context.headers.contains(HttpHeaders.Authorization)) {
+                    return@intercept
+                }
 
                 if (plugin.useOldStorage) {
                     interceptSendLegacy(plugin, content, scope)
@@ -159,10 +163,10 @@ public class HttpCache private constructor(
 
                 val cache = plugin.findResponse(context, content)
                 if (cache == null) {
-                    LOGGER.trace("No cached response for ${context.url} found")
+                    LOGGER.trace { "No cached response for ${context.url} found" }
                     val header = parseHeaderValue(context.headers[HttpHeaders.CacheControl])
                     if (CacheControl.ONLY_IF_CACHED in header) {
-                        LOGGER.trace("No cache found and \"only-if-cached\" set for ${context.url}")
+                        LOGGER.trace { "No cache found and \"only-if-cached\" set for ${context.url}" }
                         proceedWithMissingCache(scope)
                     }
                     return@intercept
@@ -170,9 +174,8 @@ public class HttpCache private constructor(
                 val validateStatus = shouldValidate(cache.expires, cache.headers, context)
 
                 if (validateStatus == ValidateStatus.ShouldNotValidate) {
-                    val cachedCall = cache
-                        .createResponse(scope, RequestForCache(context.build()), context.executionContext)
-                        .call
+                    val cachedCall =
+                        cache.createResponse(scope, RequestForCache(context.build()), context.executionContext).call
                     proceedWithCache(scope, cachedCall)
                     return@intercept
                 }
@@ -183,16 +186,19 @@ public class HttpCache private constructor(
                 }
 
                 cache.headers[HttpHeaders.ETag]?.let { etag ->
-                    LOGGER.trace("Adding If-None-Match=$etag for ${context.url}")
+                    LOGGER.trace { "Adding If-None-Match=$etag for ${context.url}" }
                     context.header(HttpHeaders.IfNoneMatch, etag)
                 }
                 cache.headers[HttpHeaders.LastModified]?.let {
-                    LOGGER.trace("Adding If-Modified-Since=$it for ${context.url}")
+                    LOGGER.trace { "Adding If-Modified-Since=$it for ${context.url}" }
                     context.header(HttpHeaders.IfModifiedSince, it)
                 }
             }
 
-            scope.receivePipeline.intercept(HttpReceivePipeline.State) { response ->
+            val cacheResponsePhase = PipelinePhase("Cache")
+            scope.receivePipeline.insertPhaseAfter(HttpReceivePipeline.State, cacheResponsePhase)
+
+            scope.receivePipeline.intercept(cacheResponsePhase) { response ->
                 if (response.call.request.method != HttpMethod.Get) return@intercept
 
                 if (plugin.useOldStorage) {
@@ -201,21 +207,25 @@ public class HttpCache private constructor(
                 }
 
                 if (response.status.isSuccess()) {
-                    LOGGER.trace("Caching response for ${response.call.request.url}")
+                    LOGGER.trace { "Caching response for ${response.call.request.url}" }
                     val cachedData = plugin.cacheResponse(response)
                     if (cachedData != null) {
-                        val reusableResponse = cachedData
-                            .createResponse(scope, response.request, response.coroutineContext)
+                        val reusableResponse = cachedData.createResponse(
+                            scope,
+                            response.request,
+                            response.coroutineContext
+                        )
                         proceedWith(reusableResponse)
                         return@intercept
                     }
                 }
 
                 if (response.status == HttpStatusCode.NotModified) {
-                    LOGGER.trace("Not modified response for ${response.call.request.url}, replying from cache")
-                    response.complete()
-                    val responseFromCache = plugin.findAndRefresh(response.call.request, response)
-                        ?: throw InvalidCacheStateException(response.call.request.url)
+                    LOGGER.trace { "Not modified response for ${response.call.request.url}, replying from cache" }
+                    val responseFromCache =
+                        plugin.findAndRefresh(response.call.request, response) ?: throw InvalidCacheStateException(
+                            response.call.request.url
+                        )
 
                     scope.monitor.raise(HttpResponseFromCache, responseFromCache)
                     proceedWith(responseFromCache)
@@ -324,11 +334,9 @@ public class HttpCache private constructor(
 
         else -> {
             val requestHeaders = mergedHeadersLookup(request.content, request.headers::get, request.headers::getAll)
-            storage.findAll(url)
-                .sortedByDescending { it.responseTime }
-                .firstOrNull { cachedResponse ->
-                    cachedResponse.varyKeys.all { (key, value) -> requestHeaders(key) == value }
-                }
+            storage.findAll(url).sortedByDescending { it.responseTime }.firstOrNull { cachedResponse ->
+                cachedResponse.varyKeys.all { (key, value) -> requestHeaders(key) == value }
+            }
         }
     }
 
@@ -368,7 +376,6 @@ internal fun mergedHeadersLookup(
     }
 }
 
-@Suppress("KDocMissingDocumentation")
 public class InvalidCacheStateException(requestUrl: Url) : IllegalStateException(
     "The entry for url: $requestUrl was removed from cache"
 )

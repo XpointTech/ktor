@@ -221,10 +221,9 @@ public final class io/ktor/client/network/sockets/ConnectTimeoutException : java
 	public fun getCause ()Ljava/lang/Throwable;
 }
 
-public final class io/ktor/client/network/sockets/SocketTimeoutException : java/net/SocketTimeoutException {
-	public fun <init> (Ljava/lang/String;Ljava/lang/Throwable;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun getCause ()Ljava/lang/Throwable;
+public final class io/ktor/client/network/sockets/TimeoutExceptionsKt {
+	public static final fun SocketTimeoutException (Ljava/lang/String;Ljava/lang/Throwable;)Ljava/net/SocketTimeoutException;
+	public static synthetic fun SocketTimeoutException$default (Ljava/lang/String;Ljava/lang/Throwable;ILjava/lang/Object;)Ljava/net/SocketTimeoutException;
 }
 
 public final class io/ktor/client/plugins/BodyProgressKt {
@@ -295,11 +294,8 @@ public final class io/ktor/client/plugins/DoubleReceivePluginKt {
 
 public final class io/ktor/client/plugins/HttpCallValidatorConfig {
 	public fun <init> ()V
-	public final fun getExpectSuccess ()Z
-	public final fun handleResponseException (Lkotlin/jvm/functions/Function2;)V
 	public final fun handleResponseException (Lkotlin/jvm/functions/Function3;)V
 	public final fun handleResponseExceptionWithRequest (Lkotlin/jvm/functions/Function3;)V
-	public final fun setExpectSuccess (Z)V
 	public final fun validateResponse (Lkotlin/jvm/functions/Function2;)V
 }
 
@@ -364,9 +360,12 @@ public final class io/ktor/client/plugins/HttpRequestRetryConfig {
 	public final fun delay (Lkotlin/jvm/functions/Function2;)V
 	public final fun delayMillis (ZLkotlin/jvm/functions/Function2;)V
 	public static synthetic fun delayMillis$default (Lio/ktor/client/plugins/HttpRequestRetryConfig;ZLkotlin/jvm/functions/Function2;ILjava/lang/Object;)V
-	public final fun exponentialDelay (DJJZ)V
-	public static synthetic fun exponentialDelay$default (Lio/ktor/client/plugins/HttpRequestRetryConfig;DJJZILjava/lang/Object;)V
+	public final fun exponentialDelay (DJJJZ)V
+	public static synthetic fun exponentialDelay$default (Lio/ktor/client/plugins/HttpRequestRetryConfig;DJJJZILjava/lang/Object;)V
 	public final fun getMaxRetries ()I
+	public final fun getModifyRequest ()Lkotlin/jvm/functions/Function2;
+	public final fun getRetryIf ()Lkotlin/jvm/functions/Function3;
+	public final fun getRetryOnExceptionIf ()Lkotlin/jvm/functions/Function3;
 	public final fun modifyRequest (Lkotlin/jvm/functions/Function2;)V
 	public final fun noRetry ()V
 	public final fun retryIf (ILkotlin/jvm/functions/Function3;)V
@@ -444,6 +443,8 @@ public final class io/ktor/client/plugins/HttpSend$Plugin : io/ktor/client/plugi
 
 public final class io/ktor/client/plugins/HttpTimeoutCapability : io/ktor/client/engine/HttpClientEngineCapability {
 	public static final field INSTANCE Lio/ktor/client/plugins/HttpTimeoutCapability;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
@@ -471,8 +472,8 @@ public final class io/ktor/client/plugins/HttpTimeoutKt {
 	public static final fun ConnectTimeoutException (Ljava/lang/String;Ljava/lang/Long;Ljava/lang/Throwable;)Lio/ktor/client/network/sockets/ConnectTimeoutException;
 	public static synthetic fun ConnectTimeoutException$default (Lio/ktor/client/request/HttpRequestData;Ljava/lang/Throwable;ILjava/lang/Object;)Lio/ktor/client/network/sockets/ConnectTimeoutException;
 	public static synthetic fun ConnectTimeoutException$default (Ljava/lang/String;Ljava/lang/Long;Ljava/lang/Throwable;ILjava/lang/Object;)Lio/ktor/client/network/sockets/ConnectTimeoutException;
-	public static final fun SocketTimeoutException (Lio/ktor/client/request/HttpRequestData;Ljava/lang/Throwable;)Lio/ktor/client/network/sockets/SocketTimeoutException;
-	public static synthetic fun SocketTimeoutException$default (Lio/ktor/client/request/HttpRequestData;Ljava/lang/Throwable;ILjava/lang/Object;)Lio/ktor/client/network/sockets/SocketTimeoutException;
+	public static final fun SocketTimeoutException (Lio/ktor/client/request/HttpRequestData;Ljava/lang/Throwable;)Ljava/net/SocketTimeoutException;
+	public static synthetic fun SocketTimeoutException$default (Lio/ktor/client/request/HttpRequestData;Ljava/lang/Throwable;ILjava/lang/Object;)Ljava/net/SocketTimeoutException;
 	public static final fun convertLongTimeoutToIntWithInfiniteAsZero (J)I
 	public static final fun convertLongTimeoutToLongWithInfiniteAsZero (J)J
 	public static final fun getHttpTimeout ()Lio/ktor/client/plugins/api/ClientPlugin;
@@ -742,6 +743,10 @@ public final class io/ktor/client/plugins/cookies/HttpCookiesKt {
 	public static final fun get (Ljava/util/List;Ljava/lang/String;)Lio/ktor/http/Cookie;
 }
 
+public final class io/ktor/client/plugins/internal/SaveBodyAbandonedReadException : java/lang/RuntimeException {
+	public fun <init> ()V
+}
+
 public final class io/ktor/client/plugins/observer/DelegatedCallKt {
 	public static final fun wrap (Lio/ktor/client/call/HttpClientCall;Lio/ktor/utils/io/ByteReadChannel;Lio/ktor/http/Headers;)Lio/ktor/client/call/HttpClientCall;
 	public static final fun wrapWithContent (Lio/ktor/client/call/HttpClientCall;Lio/ktor/utils/io/ByteReadChannel;)Lio/ktor/client/call/HttpClientCall;
@@ -765,24 +770,48 @@ public final class io/ktor/client/plugins/sse/BuildersKt {
 	public static synthetic fun serverSentEvents-1wIb-0I$default (Lio/ktor/client/HttpClient;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static final fun serverSentEvents-3bFjkrY (Lio/ktor/client/HttpClient;Ljava/lang/String;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun serverSentEvents-3bFjkrY$default (Lio/ktor/client/HttpClient;Ljava/lang/String;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static final fun serverSentEvents-BqdlHlk (Lio/ktor/client/HttpClient;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Lkotlin/jvm/functions/Function2;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun serverSentEvents-BqdlHlk$default (Lio/ktor/client/HttpClient;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Lkotlin/jvm/functions/Function2;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static final fun serverSentEvents-Mswn-_c (Lio/ktor/client/HttpClient;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun serverSentEvents-Mswn-_c$default (Lio/ktor/client/HttpClient;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static final fun serverSentEvents-mY9Nd3A (Lio/ktor/client/HttpClient;Lkotlin/jvm/functions/Function1;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun serverSentEvents-mY9Nd3A$default (Lio/ktor/client/HttpClient;Lkotlin/jvm/functions/Function1;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static final fun serverSentEvents-pTj2aPc (Lio/ktor/client/HttpClient;Ljava/lang/String;Lkotlin/jvm/functions/Function2;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun serverSentEvents-pTj2aPc$default (Lio/ktor/client/HttpClient;Ljava/lang/String;Lkotlin/jvm/functions/Function2;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static final fun serverSentEventsSession-Mswn-_c (Lio/ktor/client/HttpClient;Ljava/lang/String;Lkotlin/jvm/functions/Function2;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun serverSentEventsSession-Mswn-_c$default (Lio/ktor/client/HttpClient;Ljava/lang/String;Lkotlin/jvm/functions/Function2;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static final fun serverSentEventsSession-i8z2VEo (Lio/ktor/client/HttpClient;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun serverSentEventsSession-i8z2VEo$default (Lio/ktor/client/HttpClient;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static final fun serverSentEventsSession-mY9Nd3A (Lio/ktor/client/HttpClient;Ljava/lang/String;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun serverSentEventsSession-mY9Nd3A (Lio/ktor/client/HttpClient;Lkotlin/jvm/functions/Function2;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun serverSentEventsSession-mY9Nd3A$default (Lio/ktor/client/HttpClient;Ljava/lang/String;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static synthetic fun serverSentEventsSession-mY9Nd3A$default (Lio/ktor/client/HttpClient;Lkotlin/jvm/functions/Function2;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static final fun serverSentEventsSession-tL6_L-A (Lio/ktor/client/HttpClient;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Lkotlin/jvm/functions/Function2;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun serverSentEventsSession-tL6_L-A$default (Lio/ktor/client/HttpClient;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Lkotlin/jvm/functions/Function2;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static final fun serverSentEventsSession-xEWcMm4 (Lio/ktor/client/HttpClient;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun serverSentEventsSession-xEWcMm4$default (Lio/ktor/client/HttpClient;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static final fun sse-BAHpl2s (Lio/ktor/client/HttpClient;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun sse-BAHpl2s$default (Lio/ktor/client/HttpClient;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static final fun sse-Mswn-_c (Lio/ktor/client/HttpClient;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun sse-Mswn-_c (Lio/ktor/client/HttpClient;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun sse-Mswn-_c$default (Lio/ktor/client/HttpClient;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static synthetic fun sse-Mswn-_c$default (Lio/ktor/client/HttpClient;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static final fun sse-Q9yt8Vw (Lio/ktor/client/HttpClient;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun sse-Q9yt8Vw$default (Lio/ktor/client/HttpClient;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static final fun sse-mY9Nd3A (Lio/ktor/client/HttpClient;Lkotlin/jvm/functions/Function1;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun sse-mY9Nd3A$default (Lio/ktor/client/HttpClient;Lkotlin/jvm/functions/Function1;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static final fun sse-tL6_L-A (Lio/ktor/client/HttpClient;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun sse-tL6_L-A$default (Lio/ktor/client/HttpClient;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static final fun sseSession-Mswn-_c (Lio/ktor/client/HttpClient;Ljava/lang/String;Lkotlin/jvm/functions/Function2;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun sseSession-Mswn-_c$default (Lio/ktor/client/HttpClient;Ljava/lang/String;Lkotlin/jvm/functions/Function2;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static final fun sseSession-i8z2VEo (Lio/ktor/client/HttpClient;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun sseSession-i8z2VEo$default (Lio/ktor/client/HttpClient;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static final fun sseSession-mY9Nd3A (Lio/ktor/client/HttpClient;Ljava/lang/String;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun sseSession-mY9Nd3A (Lio/ktor/client/HttpClient;Lkotlin/jvm/functions/Function2;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun sseSession-mY9Nd3A$default (Lio/ktor/client/HttpClient;Ljava/lang/String;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static synthetic fun sseSession-mY9Nd3A$default (Lio/ktor/client/HttpClient;Lkotlin/jvm/functions/Function2;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static final fun sseSession-tL6_L-A (Lio/ktor/client/HttpClient;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Lkotlin/jvm/functions/Function2;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun sseSession-tL6_L-A$default (Lio/ktor/client/HttpClient;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Lkotlin/jvm/functions/Function2;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static final fun sseSession-xEWcMm4 (Lio/ktor/client/HttpClient;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun sseSession-xEWcMm4$default (Lio/ktor/client/HttpClient;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Lkotlin/time/Duration;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
@@ -794,6 +823,14 @@ public final class io/ktor/client/plugins/sse/ClientSSESession : io/ktor/client/
 	public fun getIncoming ()Lkotlinx/coroutines/flow/Flow;
 }
 
+public final class io/ktor/client/plugins/sse/ClientSSESessionWithDeserialization : io/ktor/client/plugins/sse/SSESessionWithDeserialization {
+	public fun <init> (Lio/ktor/client/call/HttpClientCall;Lio/ktor/client/plugins/sse/SSESessionWithDeserialization;)V
+	public final fun getCall ()Lio/ktor/client/call/HttpClientCall;
+	public fun getCoroutineContext ()Lkotlin/coroutines/CoroutineContext;
+	public fun getDeserializer ()Lkotlin/jvm/functions/Function2;
+	public fun getIncoming ()Lkotlinx/coroutines/flow/Flow;
+}
+
 public final class io/ktor/client/plugins/sse/DefaultClientSSESession : io/ktor/client/plugins/sse/SSESession {
 	public fun <init> (Lio/ktor/client/plugins/sse/SSEClientContent;Lio/ktor/utils/io/ByteReadChannel;Lkotlin/coroutines/CoroutineContext;)V
 	public fun getCoroutineContext ()Lkotlin/coroutines/CoroutineContext;
@@ -802,6 +839,8 @@ public final class io/ktor/client/plugins/sse/DefaultClientSSESession : io/ktor/
 
 public final class io/ktor/client/plugins/sse/SSECapability : io/ktor/client/engine/HttpClientEngineCapability {
 	public static final field INSTANCE Lio/ktor/client/plugins/sse/SSECapability;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
@@ -838,6 +877,11 @@ public final class io/ktor/client/plugins/sse/SSEKt {
 }
 
 public abstract interface class io/ktor/client/plugins/sse/SSESession : kotlinx/coroutines/CoroutineScope {
+	public abstract fun getIncoming ()Lkotlinx/coroutines/flow/Flow;
+}
+
+public abstract interface class io/ktor/client/plugins/sse/SSESessionWithDeserialization : kotlinx/coroutines/CoroutineScope {
+	public abstract fun getDeserializer ()Lkotlin/jvm/functions/Function2;
 	public abstract fun getIncoming ()Lkotlinx/coroutines/flow/Flow;
 }
 
@@ -901,8 +945,18 @@ public final class io/ktor/client/plugins/websocket/DefaultClientWebSocketSessio
 	public fun terminate ()V
 }
 
+public final class io/ktor/client/plugins/websocket/DurationsKt {
+	public static final fun WebSockets-dnQKTGw (Lkotlin/time/Duration;J)Lio/ktor/client/plugins/websocket/WebSockets;
+	public static synthetic fun WebSockets-dnQKTGw$default (Lkotlin/time/Duration;JILjava/lang/Object;)Lio/ktor/client/plugins/websocket/WebSockets;
+	public static final fun getPingInterval (Lio/ktor/client/plugins/websocket/WebSockets$Config;)Lkotlin/time/Duration;
+	public static final fun getPingInterval (Lio/ktor/client/plugins/websocket/WebSockets;)Lkotlin/time/Duration;
+	public static final fun setPingInterval-6Au4x4Y (Lio/ktor/client/plugins/websocket/WebSockets$Config;Lkotlin/time/Duration;)V
+}
+
 public final class io/ktor/client/plugins/websocket/WebSocketCapability : io/ktor/client/engine/HttpClientEngineCapability {
 	public static final field INSTANCE Lio/ktor/client/plugins/websocket/WebSocketCapability;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
@@ -913,6 +967,8 @@ public final class io/ktor/client/plugins/websocket/WebSocketException : java/la
 
 public final class io/ktor/client/plugins/websocket/WebSocketExtensionsCapability : io/ktor/client/engine/HttpClientEngineCapability {
 	public static final field INSTANCE Lio/ktor/client/plugins/websocket/WebSocketExtensionsCapability;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
@@ -923,7 +979,7 @@ public final class io/ktor/client/plugins/websocket/WebSockets {
 	public synthetic fun <init> (JJILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getContentConverter ()Lio/ktor/serialization/WebsocketContentConverter;
 	public final fun getMaxFrameSize ()J
-	public final fun getPingInterval ()J
+	public final fun getPingIntervalMillis ()J
 }
 
 public final class io/ktor/client/plugins/websocket/WebSockets$Config {
@@ -931,10 +987,10 @@ public final class io/ktor/client/plugins/websocket/WebSockets$Config {
 	public final fun extensions (Lkotlin/jvm/functions/Function1;)V
 	public final fun getContentConverter ()Lio/ktor/serialization/WebsocketContentConverter;
 	public final fun getMaxFrameSize ()J
-	public final fun getPingInterval ()J
+	public final fun getPingIntervalMillis ()J
 	public final fun setContentConverter (Lio/ktor/serialization/WebsocketContentConverter;)V
 	public final fun setMaxFrameSize (J)V
-	public final fun setPingInterval (J)V
+	public final fun setPingIntervalMillis (J)V
 }
 
 public final class io/ktor/client/plugins/websocket/WebSockets$Plugin : io/ktor/client/plugins/HttpClientPlugin {
@@ -1350,9 +1406,9 @@ public final class io/ktor/client/request/forms/MultiPartFormDataContent : io/kt
 public final class io/ktor/client/statement/DefaultHttpResponse : io/ktor/client/statement/HttpResponse {
 	public fun <init> (Lio/ktor/client/call/HttpClientCall;Lio/ktor/client/request/HttpResponseData;)V
 	public fun getCall ()Lio/ktor/client/call/HttpClientCall;
-	public fun getContent ()Lio/ktor/utils/io/ByteReadChannel;
 	public fun getCoroutineContext ()Lkotlin/coroutines/CoroutineContext;
 	public fun getHeaders ()Lio/ktor/http/Headers;
+	public fun getRawContent ()Lio/ktor/utils/io/ByteReadChannel;
 	public fun getRequestTime ()Lio/ktor/util/date/GMTDate;
 	public fun getResponseTime ()Lio/ktor/util/date/GMTDate;
 	public fun getStatus ()Lio/ktor/http/HttpStatusCode;
@@ -1376,7 +1432,7 @@ public final class io/ktor/client/statement/HttpReceivePipeline$Phases {
 public abstract class io/ktor/client/statement/HttpResponse : io/ktor/http/HttpMessage, kotlinx/coroutines/CoroutineScope {
 	public fun <init> ()V
 	public abstract fun getCall ()Lio/ktor/client/call/HttpClientCall;
-	public abstract fun getContent ()Lio/ktor/utils/io/ByteReadChannel;
+	public abstract fun getRawContent ()Lio/ktor/utils/io/ByteReadChannel;
 	public abstract fun getRequestTime ()Lio/ktor/util/date/GMTDate;
 	public abstract fun getResponseTime ()Lio/ktor/util/date/GMTDate;
 	public abstract fun getStatus ()Lio/ktor/http/HttpStatusCode;
@@ -1398,10 +1454,12 @@ public final class io/ktor/client/statement/HttpResponseContainer {
 }
 
 public final class io/ktor/client/statement/HttpResponseKt {
+	public static final fun bodyAsBytes (Lio/ktor/client/statement/HttpResponse;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static final fun bodyAsChannel (Lio/ktor/client/statement/HttpResponse;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static final fun bodyAsText (Lio/ktor/client/statement/HttpResponse;Ljava/nio/charset/Charset;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun bodyAsText$default (Lio/ktor/client/statement/HttpResponse;Ljava/nio/charset/Charset;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static final fun complete (Lio/ktor/client/statement/HttpResponse;)V
+	public static final fun getContent (Lio/ktor/client/statement/HttpResponse;)Lio/ktor/utils/io/ByteReadChannel;
 	public static final fun getRequest (Lio/ktor/client/statement/HttpResponse;)Lio/ktor/client/request/HttpRequest;
 }
 
@@ -1436,6 +1494,7 @@ public final class io/ktor/client/statement/ReadersKt {
 	public static final fun discardRemaining (Lio/ktor/client/statement/HttpResponse;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static final fun readBytes (Lio/ktor/client/statement/HttpResponse;ILkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static final fun readBytes (Lio/ktor/client/statement/HttpResponse;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun readRawBytes (Lio/ktor/client/statement/HttpResponse;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class io/ktor/client/utils/CIOJvmKt {
@@ -1482,7 +1541,9 @@ public final class io/ktor/client/utils/CoroutineDispatcherUtilsKt {
 
 public final class io/ktor/client/utils/EmptyContent : io/ktor/http/content/OutgoingContent$NoContent {
 	public static final field INSTANCE Lio/ktor/client/utils/EmptyContent;
+	public fun equals (Ljava/lang/Object;)Z
 	public fun getContentLength ()Ljava/lang/Long;
+	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
@@ -1493,6 +1554,11 @@ public final class io/ktor/client/utils/ExceptionUtilsJvmKt {
 public final class io/ktor/client/utils/HeadersKt {
 	public static final fun buildHeaders (Lkotlin/jvm/functions/Function1;)Lio/ktor/http/Headers;
 	public static synthetic fun buildHeaders$default (Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lio/ktor/http/Headers;
+}
+
+public final class io/ktor/client/utils/HeadersUtilsKt {
+	public static final fun dropCompressionHeaders (Lio/ktor/http/HeadersBuilder;Lio/ktor/http/HttpMethod;Lio/ktor/util/Attributes;Z)V
+	public static synthetic fun dropCompressionHeaders$default (Lio/ktor/http/HeadersBuilder;Lio/ktor/http/HttpMethod;Lio/ktor/util/Attributes;ZILjava/lang/Object;)V
 }
 
 public final class io/ktor/client/utils/HttpResponseReceiveFail {

@@ -14,7 +14,6 @@ import io.ktor.utils.io.jvm.javaio.*
 import kotlinx.coroutines.*
 import java.io.*
 
-@OptIn(InternalAPI::class)
 internal actual fun HttpClient.platformResponseDefaultTransformers() {
     responsePipeline.intercept(HttpResponsePipeline.Parse) { (info, body) ->
         if (body !is ByteReadChannel) return@intercept
@@ -29,7 +28,6 @@ internal actual fun HttpClient.platformResponseDefaultTransformers() {
                     override fun close() {
                         super.close()
                         stream.close()
-                        context.response.complete()
                     }
                 }
                 proceedWith(HttpResponseContainer(info, response))

@@ -1,6 +1,6 @@
 /*
-* Copyright 2014-2021 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
-*/
+ * Copyright 2014-2024 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
+ */
 
 package io.ktor.server.servlet
 
@@ -16,7 +16,6 @@ import java.lang.reflect.*
 import javax.servlet.http.*
 import kotlin.coroutines.*
 
-@Suppress("KDocMissingDocumentation")
 public open class AsyncServletApplicationCall(
     application: Application,
     servletRequest: HttpServletRequest,
@@ -53,7 +52,6 @@ public open class AsyncServletApplicationCall(
     }
 }
 
-@Suppress("KDocMissingDocumentation")
 public class AsyncServletApplicationRequest(
     call: PipelineCall,
     servletRequest: HttpServletRequest,
@@ -66,7 +64,9 @@ public class AsyncServletApplicationRequest(
         if (!upgraded) {
             val contentLength = servletRequest.contentLength
             servletReader(servletRequest.inputStream, contentLength).channel
-        } else ByteReadChannel.Empty
+        } else {
+            ByteReadChannel.Empty
+        }
     }
 
     override val engineReceiveChannel: ByteReadChannel get() = inputStreamChannel
@@ -76,7 +76,6 @@ public class AsyncServletApplicationRequest(
     }
 }
 
-@Suppress("DEPRECATION")
 public open class AsyncServletApplicationResponse(
     call: AsyncServletApplicationCall,
     protected val servletRequest: HttpServletRequest,

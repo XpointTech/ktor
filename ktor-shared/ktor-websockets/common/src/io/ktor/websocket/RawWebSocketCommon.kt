@@ -11,6 +11,7 @@ import io.ktor.utils.io.errors.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.*
+import kotlinx.io.*
 import kotlin.coroutines.*
 import kotlin.random.*
 
@@ -32,7 +33,7 @@ public expect fun RawWebSocket(
     coroutineContext: CoroutineContext
 ): WebSocketSession
 
-@OptIn(ExperimentalCoroutinesApi::class, InternalAPI::class)
+@OptIn(InternalAPI::class)
 internal class RawWebSocketCommon(
     private val input: ByteReadChannel,
     private val output: ByteWriteChannel,
@@ -54,16 +55,20 @@ internal class RawWebSocketCommon(
 
     private val writerJob = launch(context = CoroutineName("ws-writer"), start = CoroutineStart.ATOMIC) {
         try {
-            mainLoop@ while (true) when (val message = _outgoing.receive()) {
-                is Frame -> {
-                    output.writeFrame(message, masking)
-                    output.flush()
-                    if (message is Frame.Close) break@mainLoop
+            mainLoop@ while (true) {
+                when (val message = _outgoing.receive()) {
+                    is Frame -> {
+                        output.writeFrame(message, masking)
+                        output.flush()
+                        if (message is Frame.Close) break@mainLoop
+                    }
+
+                    is FlushRequest -> {
+                        message.complete()
+                    }
+
+                    else -> throw IllegalArgumentException("unknown message $message")
                 }
-                is FlushRequest -> {
-                    message.complete()
-                }
-                else -> throw IllegalArgumentException("unknown message $message")
             }
             _outgoing.close()
         } catch (cause: ChannelWriteException) {
@@ -72,13 +77,15 @@ internal class RawWebSocketCommon(
             _outgoing.close(t)
         } finally {
             _outgoing.close(CancellationException("WebSocket closed.", null))
-            @Suppress("DEPRECATION")
-            output.close()
+
+            output.flushAndClose()
         }
 
-        while (true) when (val message = _outgoing.tryReceive().getOrNull() ?: break) {
-            is FlushRequest -> message.complete()
-            else -> {}
+        while (true) {
+            when (val message = _outgoing.tryReceive().getOrNull() ?: break) {
+                is FlushRequest -> message.complete()
+                else -> {}
+            }
         }
     }
 
@@ -145,8 +152,7 @@ internal class RawWebSocketCommon(
     }
 }
 
-@Suppress("DEPRECATION")
-private fun ByteReadPacket.mask(maskKey: Int): ByteReadPacket = withMemory(4) { maskMemory ->
+private fun Source.mask(maskKey: Int): Source = withMemory(4) { maskMemory ->
     maskMemory.storeIntAt(0, maskKey)
     buildPacket {
         repeat(remaining.toInt()) { i ->
@@ -194,6 +200,7 @@ public suspend fun ByteWriteChannel.writeFrame(frame: Frame, masking: Boolean) {
             writeInt(maskKey)
             data.mask(maskKey)
         }
+
         false -> data
     }
     writePacket(maskedData)
@@ -205,7 +212,7 @@ public suspend fun ByteWriteChannel.writeFrame(frame: Frame, masking: Boolean) {
  * @param maxFrameSize maximum frame size that could be read
  * @param lastOpcode last read opcode
  */
-@Suppress("DEPRECATION")
+
 @InternalAPI // used in tests
 public suspend fun ByteReadChannel.readFrame(maxFrameSize: Long, lastOpcode: Int): Frame {
     val flagsAndOpcode = readByte().toInt()
@@ -254,7 +261,7 @@ public suspend fun ByteReadChannel.readFrame(maxFrameSize: Long, lastOpcode: Int
     return Frame.byType(
         fin = fin,
         frameType = frameType,
-        data = maskedData.readBytes(),
+        data = maskedData.readByteArray(),
         rsv1 = flagsAndOpcode and 0x40 != 0,
         rsv2 = flagsAndOpcode and 0x20 != 0,
         rsv3 = flagsAndOpcode and 0x10 != 0

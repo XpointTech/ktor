@@ -4,6 +4,7 @@
 
 package io.ktor.server.metrics.micrometer
 
+import io.ktor.http.HttpMethod.Companion.DefaultMethods
 import io.ktor.server.application.*
 import io.ktor.server.application.hooks.*
 import io.ktor.server.application.hooks.Metrics
@@ -76,7 +77,8 @@ public class MicrometerMetricsConfig {
         JvmGcMetrics(),
         ProcessorMetrics(),
         JvmThreadMetrics(),
-        FileDescriptorMetrics()
+        FileDescriptorMetrics(),
+        UptimeMetrics(),
     )
 
     /**
@@ -118,6 +120,12 @@ public val MicrometerMetrics: ApplicationPlugin<MicrometerMetricsConfig> =
         val metricName = pluginConfig.metricName
         val activeRequestsGaugeName = "$metricName.active"
         val registry = pluginConfig.registry
+
+        registry.config().meterFilter(object : MeterFilter {
+            override fun configure(id: Meter.Id, config: DistributionStatisticConfig): DistributionStatisticConfig =
+                if (id.name == metricName) pluginConfig.distributionStatisticConfig.merge(config) else config
+        })
+
         val active = registry.gauge(activeRequestsGaugeName, AtomicInteger(0))
         val measureKey = AttributeKey<CallMeasure>("micrometerMetrics")
 
@@ -136,27 +144,26 @@ public val MicrometerMetrics: ApplicationPlugin<MicrometerMetricsConfig> =
             return this
         }
 
-        registry.config().meterFilter(object : MeterFilter {
-            override fun configure(id: Meter.Id, config: DistributionStatisticConfig): DistributionStatisticConfig =
-                if (id.name == metricName) pluginConfig.distributionStatisticConfig.merge(config) else config
-        })
         pluginConfig.meterBinders.forEach { it.bindTo(pluginConfig.registry) }
 
         @OptIn(InternalAPI::class)
         on(Metrics) { call ->
-            active?.incrementAndGet()
-            call.attributes.put(measureKey, CallMeasure(Timer.start(registry)))
+            if (call.request.httpMethod in DefaultMethods) {
+                active?.incrementAndGet()
+                call.attributes.put(measureKey, CallMeasure(Timer.start(registry)))
+            }
         }
 
         on(ResponseSent) { call ->
-            active?.decrementAndGet()
-            val measure = call.attributes[measureKey]
-            measure.timer.stop(
-                Timer.builder(metricName)
-                    .addDefaultTags(call, measure.throwable)
-                    .apply { pluginConfig.timerBuilder(this, call, measure.throwable) }
-                    .register(registry)
-            )
+            call.attributes.getOrNull(measureKey)?.let { measure ->
+                active?.decrementAndGet()
+                measure.timer.stop(
+                    Timer.builder(metricName)
+                        .addDefaultTags(call, measure.throwable)
+                        .apply { pluginConfig.timerBuilder(this, call, measure.throwable) }
+                        .register(registry)
+                )
+            }
         }
 
         on(CallFailed) { call, cause ->
@@ -165,7 +172,9 @@ public val MicrometerMetrics: ApplicationPlugin<MicrometerMetricsConfig> =
         }
 
         application.monitor.subscribe(RoutingRoot.RoutingCallStarted) { call ->
-            call.attributes[measureKey].route = call.route.parent.toString()
+            call.attributes.getOrNull(measureKey)?.let { measure ->
+                measure.route = call.route.parent.toString()
+            }
         }
     }
 

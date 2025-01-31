@@ -1,12 +1,12 @@
-// ktlint-disable filename
 /*
- * Copyright 2014-2022 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
+ * Copyright 2014-2024 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
  */
 
 package io.ktor.websocket
 
 import io.ktor.utils.io.core.*
 import kotlinx.coroutines.*
+import kotlinx.io.*
 
 /**
  * A frame received or ready to be sent. It is not reusable and not thread-safe
@@ -15,7 +15,7 @@ import kotlinx.coroutines.*
  * @property data - a frame content or fragment content
  * @property disposableHandle could be invoked when the frame is processed
  */
-@Suppress("DEPRECATION")
+
 public actual sealed class Frame actual constructor(
     public actual val fin: Boolean,
     public actual val frameType: FrameType,
@@ -39,7 +39,7 @@ public actual sealed class Frame actual constructor(
         rsv3: Boolean
     ) : Frame(fin, FrameType.BINARY, data, NonDisposableHandle, rsv1, rsv2, rsv3) {
         public actual constructor(fin: Boolean, data: ByteArray) : this(fin, data, false, false, false)
-        public actual constructor(fin: Boolean, packet: ByteReadPacket) : this(fin, packet.readBytes())
+        public actual constructor(fin: Boolean, packet: Source) : this(fin, packet.readByteArray())
     }
 
     /**
@@ -59,7 +59,7 @@ public actual sealed class Frame actual constructor(
     ) : Frame(fin, FrameType.TEXT, data, NonDisposableHandle, rsv1, rsv2, rsv3) {
         public actual constructor(fin: Boolean, data: ByteArray) : this(fin, data, false, false, false)
         public actual constructor(text: String) : this(true, text.toByteArray())
-        public actual constructor(fin: Boolean, packet: ByteReadPacket) : this(fin, packet.readBytes())
+        public actual constructor(fin: Boolean, packet: Source) : this(fin, packet.readByteArray())
     }
 
     /**
@@ -76,7 +76,7 @@ public actual sealed class Frame actual constructor(
             }
         )
 
-        public actual constructor(packet: ByteReadPacket) : this(packet.readBytes())
+        public actual constructor(packet: Source) : this(packet.readByteArray())
         public actual constructor() : this(Empty)
     }
 
@@ -87,7 +87,7 @@ public actual sealed class Frame actual constructor(
     public actual class Ping actual constructor(
         data: ByteArray
     ) : Frame(true, FrameType.PING, data, NonDisposableHandle, false, false, false) {
-        public actual constructor(packet: ByteReadPacket) : this(packet.readBytes())
+        public actual constructor(packet: Source) : this(packet.readByteArray())
     }
 
     /**
@@ -98,7 +98,7 @@ public actual sealed class Frame actual constructor(
         data: ByteArray,
         disposableHandle: DisposableHandle
     ) : Frame(true, FrameType.PONG, data, disposableHandle, false, false, false) {
-        public actual constructor(packet: ByteReadPacket) : this(packet.readBytes(), NonDisposableHandle)
+        public actual constructor(packet: Source) : this(packet.readByteArray(), NonDisposableHandle)
     }
 
     override fun toString(): String = "Frame $frameType (fin=$fin, buffer len = ${data.size})"

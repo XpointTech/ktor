@@ -1,6 +1,7 @@
 /*
-* Copyright 2014-2021 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
-*/
+ * Copyright 2014-2024 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
+ */
+
 package io.ktor.client.plugins.cache.tests
 
 import io.ktor.client.call.*
@@ -129,7 +130,7 @@ class CacheExpiresTest {
             get() = error("Shouldn't be used")
 
         @OptIn(InternalAPI::class)
-        override val content: ByteReadChannel
+        override val rawContent: ByteReadChannel
             get() = error("Shouldn't be used")
         override val coroutineContext: CoroutineContext
             get() = error("Shouldn't be used")

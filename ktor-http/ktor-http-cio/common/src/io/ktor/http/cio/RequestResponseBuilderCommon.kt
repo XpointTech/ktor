@@ -5,7 +5,7 @@
 package io.ktor.http.cio
 
 import io.ktor.http.*
-import io.ktor.utils.io.core.*
+import kotlinx.io.*
 
 /**
  * Builds an HTTP request or response
@@ -44,15 +44,11 @@ public expect class RequestResponseBuilder() {
     /**
      * Build a packet of request/response
      */
-    @Suppress("DEPRECATION")
-    public fun build(): ByteReadPacket
+
+    public fun build(): Source
 
     /**
      * Release all resources hold by the builder
      */
     public fun release()
 }
-
-private const val SP: Byte = 0x20
-private const val CR: Byte = 0x0d
-private const val LF: Byte = 0x0a

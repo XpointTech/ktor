@@ -197,7 +197,7 @@ class TestApplicationTestJvm {
                 error = exception
             }
         }
-        testApplicationProperties {
+        serverConfig {
             parentCoroutineContext = exceptionHandler
         }
         application {
@@ -288,7 +288,7 @@ class TestApplicationTestJvm {
         override fun toString(): String = "=====$data====="
     }
 
-    public fun Application.module() {
+    fun Application.module() {
         routing {
             get { call.respond("OK FROM MODULE") }
         }
@@ -344,14 +344,10 @@ class TestApplicationTestJvm {
     }
 
     @Test
-    fun testSocketTimeoutWriteElapsed() {
-        testSocketTimeoutWrite(100, true)
-    }
+    fun testSocketTimeoutWriteElapsed() = testSocketTimeoutWrite(100, true)
 
     @Test
-    fun testSocketTimeoutWriteNotElapsed() {
-        testSocketTimeoutWrite(1000, false)
-    }
+    fun testSocketTimeoutWriteNotElapsed() = testSocketTimeoutWrite(1000, false)
 }
 
 class TestClass(val value: Int) : Serializable

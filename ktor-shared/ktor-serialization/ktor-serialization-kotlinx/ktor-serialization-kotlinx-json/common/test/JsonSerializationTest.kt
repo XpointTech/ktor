@@ -1,8 +1,10 @@
 /*
- * Copyright 2014-2021 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
+ * Copyright 2014-2024 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
  */
+
 package io.ktor.serialization.kotlinx.test.json
 
+import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import io.ktor.serialization.*
 import io.ktor.serialization.kotlinx.*
@@ -136,12 +138,32 @@ class JsonSerializationTest : AbstractSerializationTest<Json>() {
     }
 
     @Test
-    @Ignore // https://github.com/Kotlin/kotlinx.serialization/issues/2218
+    fun testListsWithExperimentApi() = testSuspend {
+        val testSerializer = ExperimentalJsonConverter(defaultSerializationFormat)
+        val expected = listOf(DogDTO(8, "Auri"))
+        val serialized = testSerializer.serialize(
+            ContentType.Application.Json,
+            Charsets.UTF_8,
+            typeInfo<List<DogDTO>>(),
+            expected
+        ).toByteArray().decodeToString()
+        assertEquals("""[{"age":8,"name":"Auri"}]""", serialized)
+        assertEquals(
+            expected,
+            testSerializer.deserialize(
+                Charsets.UTF_8,
+                typeInfo<List<DogDTO>>(),
+                ByteReadChannel(serialized.toByteArray())
+            )
+        )
+    }
+
+    @Test
     fun testSequence() = testSuspend {
         if (!PlatformUtils.IS_JVM) return@testSuspend
 
         val testSerializer = KotlinxSerializationConverter(defaultSerializationFormat)
-        val dogListJson = """[{"age": 8,"name":"Auri"}]"""
+        val dogListJson = """[{"age":8,"name":"Auri"}]"""
         assertContentEquals(
             sequenceOf(DogDTO(8, "Auri")),
             testSerializer.deserialize(

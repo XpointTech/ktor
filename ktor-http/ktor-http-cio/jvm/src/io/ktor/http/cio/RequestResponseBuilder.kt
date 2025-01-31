@@ -1,18 +1,18 @@
 /*
- * Copyright 2014-2019 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
+ * Copyright 2014-2024 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
  */
 
 package io.ktor.http.cio
 
 import io.ktor.http.*
-import io.ktor.utils.io.*
 import io.ktor.utils.io.core.*
-import java.nio.*
+import kotlinx.io.Source
+import java.nio.ByteBuffer
 
 /**
  * Builds an HTTP request or response
  */
-@Suppress("DEPRECATION")
+
 public actual class RequestResponseBuilder actual constructor() {
     private val packet = BytePacketBuilder()
 
@@ -87,13 +87,13 @@ public actual class RequestResponseBuilder actual constructor() {
     /**
      * Build a packet of request/response
      */
-    public actual fun build(): ByteReadPacket = packet.build()
+    public actual fun build(): Source = packet.build()
 
     /**
      * Release all resources hold by the builder
      */
     public actual fun release() {
-        packet.release()
+        packet.close()
     }
 }
 

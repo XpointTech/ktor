@@ -10,25 +10,19 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.test.base.*
-import io.ktor.server.testing.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.*
-import org.junit.jupiter.api.*
 import kotlin.test.*
-import kotlin.test.Test
 
-@Suppress("DEPRECATION")
 abstract class ServerPluginsTestSuite<TEngine : ApplicationEngine, TConfiguration : ApplicationEngine.Configuration>(
     hostFactory: ApplicationEngineFactory<TEngine, TConfiguration>
 ) : EngineTestBase<TEngine, TConfiguration>(hostFactory) {
 
     private var semaphore = Semaphore(1)
-    private fun setNumberOfEvents(n: Int) {
+    private suspend fun setNumberOfEvents(n: Int) {
         semaphore = Semaphore(n)
-        runBlocking {
-            repeat(n) {
-                semaphore.acquire()
-            }
+        repeat(n) {
+            semaphore.acquire()
         }
     }
 
@@ -44,17 +38,19 @@ abstract class ServerPluginsTestSuite<TEngine : ApplicationEngine, TConfiguratio
         semaphore.release()
     }
 
-    private fun assertEvents(events: List<String>, timeoutMillis: Long, withUrlBlock: (suspend () -> Unit) -> Unit) {
+    private suspend fun assertEvents(
+        events: List<String>,
+        timeoutMillis: Long,
+        withUrlBlock: suspend (suspend () -> Unit) -> Unit
+    ) {
         eventsList.clear()
         setNumberOfEvents(events.size)
 
-        runBlocking {
-            withTimeout(timeoutMillis) {
-                withUrlBlock {
-                    expectNumberOfEvents(events.size)
+        withTimeout(timeoutMillis) {
+            withUrlBlock {
+                expectNumberOfEvents(events.size)
 
-                    assertEquals(events, eventsList.toList())
-                }
+                assertEquals(events, eventsList.toList())
             }
         }
     }
@@ -73,14 +69,14 @@ abstract class ServerPluginsTestSuite<TEngine : ApplicationEngine, TConfiguratio
 
     val expectedEventsForCall = listOf("onCall", "onCallReceive", "onCallRespond")
 
-    override fun plugins(application: Application, routingConfig: Routing.() -> Unit) {
+    override fun plugins(application: Application, routingConfig: Route.() -> Unit) {
         super.plugins(application, routingConfig)
 
         application.install(plugin)
     }
 
     @Test
-    fun testCoroutineContextIsCreatedForSingleCallOnly() {
+    fun testCoroutineContextIsCreatedForSingleCallOnly() = runTest {
         createAndStartServer {
             get("/request") {
                 val data = call.receive<String>()

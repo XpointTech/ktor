@@ -1,19 +1,19 @@
 /*
- * Copyright 2014-2022 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
+ * Copyright 2014-2025 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
  */
 
 package io.ktor.client.tests
 
 import io.ktor.client.plugins.logging.*
-import io.ktor.client.plugins.logging.Logger
 import io.ktor.client.request.*
-import io.ktor.client.tests.utils.*
+import io.ktor.client.test.base.*
 import io.ktor.http.*
 import io.ktor.utils.io.*
-import kotlinx.coroutines.*
-import kotlinx.coroutines.slf4j.*
-import org.slf4j.*
-import kotlin.test.*
+import kotlinx.coroutines.withContext
+import org.slf4j.MDC
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 private class LoggerWithMdc : Logger {
     val logs = mutableListOf<Pair<String, String>>()
@@ -29,8 +29,9 @@ private class LoggerWithMdc : Logger {
 
 class LoggingTestJvm : ClientLoader() {
 
+    @OptIn(InternalAPI::class)
     @Test
-    fun testMdc() = clientTests(listOf("native:CIO")) {
+    fun testMdc() = clientTests(except("native:CIO")) {
         val testLogger = LoggerWithMdc()
 
         config {
@@ -54,7 +55,13 @@ class LoggingTestJvm : ClientLoader() {
 
         after {
             assertTrue(testLogger.logs.isNotEmpty())
-            assertTrue(testLogger.logs.all { it.second == "[mdc=value]" })
+            testLogger.logs.forEach {
+                assertEquals(
+                    "[mdc=value]",
+                    it.second,
+                    "MDC context is not preserved in $it message (${it.second}): ${it.first}"
+                )
+            }
         }
     }
 }

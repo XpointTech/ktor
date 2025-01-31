@@ -1,6 +1,7 @@
 /*
-* Copyright 2014-2021 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
-*/
+ * Copyright 2014-2024 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
+ */
+
 package io.ktor.util
 
 import io.ktor.utils.io.*
@@ -43,11 +44,11 @@ public class CaseInsensitiveSet() : MutableSet<String> {
     }
 
     override fun removeAll(elements: Collection<String>): Boolean {
-        return backingMap.keys.removeAll(elements)
+        return backingMap.keys.removeAll(elements.toSet())
     }
 
     override fun retainAll(elements: Collection<String>): Boolean {
-        return backingMap.keys.retainAll(elements)
+        return backingMap.keys.retainAll(elements.toSet())
     }
 
     override fun contains(element: String): Boolean {

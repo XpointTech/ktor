@@ -15,7 +15,7 @@ import io.netty.channel.*
 import io.netty.handler.codec.http.*
 import kotlin.coroutines.*
 
-internal class NettyHttp1ApplicationResponse constructor(
+internal class NettyHttp1ApplicationResponse(
     call: NettyApplicationCall,
     context: ChannelHandlerContext,
     engineContext: CoroutineContext,
@@ -76,7 +76,6 @@ internal class NettyHttp1ApplicationResponse constructor(
         return responseMessage
     }
 
-    @OptIn(InternalAPI::class)
     override suspend fun respondUpgrade(upgrade: OutgoingContent.ProtocolUpgrade) {
         val nettyContext = context
         val nettyChannel = nettyContext.channel()

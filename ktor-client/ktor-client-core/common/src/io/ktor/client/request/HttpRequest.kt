@@ -1,6 +1,6 @@
 /*
-* Copyright 2014-2021 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
-*/
+ * Copyright 2014-2024 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
+ */
 
 package io.ktor.client.request
 
@@ -206,7 +206,7 @@ public class HttpRequestData @InternalAPI constructor(
 /**
  * Data prepared for [HttpResponse].
  */
-public class HttpResponseData constructor(
+public class HttpResponseData(
     public val statusCode: HttpStatusCode,
     public val requestTime: GMTDate,
     public val headers: Headers,
@@ -294,28 +294,24 @@ public operator fun HttpRequestBuilder.Companion.invoke(
 /**
  * Sets the [HttpRequestBuilder.url] from [urlString].
  */
-public fun HttpRequestBuilder.url(urlString: String) { // ktlint-disable filename
+public fun HttpRequestBuilder.url(urlString: String) {
     url.takeFrom(urlString)
 }
 
 @InternalAPI
-@Suppress("KDocMissingDocumentation")
 public fun HttpRequestData.isUpgradeRequest(): Boolean {
     return body is ClientUpgradeContent
 }
 
 @InternalAPI
-@Suppress("KDocMissingDocumentation")
 public fun HttpRequestData.isSseRequest(): Boolean {
     return body is SSEClientContent
 }
 
 @InternalAPI
-@Suppress("KDocMissingDocumentation")
 public val ResponseAdapterAttributeKey: AttributeKey<ResponseAdapter> = AttributeKey("ResponseAdapterAttributeKey")
 
 @InternalAPI
-@Suppress("KDocMissingDocumentation")
 public fun interface ResponseAdapter {
     public fun adapt(
         data: HttpRequestData,
@@ -328,7 +324,6 @@ public fun interface ResponseAdapter {
 }
 
 @InternalAPI
-@Suppress("KDocMissingDocumentation")
 public class SSEClientResponseAdapter : ResponseAdapter {
     @OptIn(InternalAPI::class)
     override fun adapt(
@@ -344,8 +339,9 @@ public class SSEClientResponseAdapter : ResponseAdapter {
             status == HttpStatusCode.OK &&
             contentType?.withoutParameters() == ContentType.Text.EventStream
         ) {
+            outgoingContent as SSEClientContent
             DefaultClientSSESession(
-                outgoingContent as SSEClientContent,
+                outgoingContent,
                 responseBody,
                 callContext
             )

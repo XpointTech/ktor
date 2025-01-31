@@ -1,4 +1,12 @@
-apply<test.server.TestServerPlugin>()
+/*
+ * Copyright 2014-2024 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
+ */
+
+import org.jetbrains.kotlin.gradle.targets.jvm.tasks.KotlinJvmTest
+
+plugins {
+    id("test-server")
+}
 
 kotlin.sourceSets {
     jvmMain {
@@ -14,12 +22,9 @@ kotlin.sourceSets {
         }
     }
 }
+
 // pass JVM option to enlarge built-in HttpUrlConnection pool
 // to avoid failures due to lack of local socket ports
-val jvmTest: org.jetbrains.kotlin.gradle.targets.jvm.tasks.KotlinJvmTest by tasks
-
-jvmTest.apply {
-    useJUnitPlatform()
-
+tasks.named<KotlinJvmTest>("jvmTest") {
     jvmArgs("-Dhttp.maxConnections=32")
 }

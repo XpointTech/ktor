@@ -175,6 +175,7 @@ public final class io/ktor/http/ContentType$Application {
 	public final fun getXlsx ()Lio/ktor/http/ContentType;
 	public final fun getXml ()Lio/ktor/http/ContentType;
 	public final fun getXml_Dtd ()Lio/ktor/http/ContentType;
+	public final fun getYaml ()Lio/ktor/http/ContentType;
 	public final fun getZip ()Lio/ktor/http/ContentType;
 }
 
@@ -262,7 +263,8 @@ public final class io/ktor/http/ContentTypesKt {
 	public static final fun withCharsetIfNeeded (Lio/ktor/http/ContentType;Ljava/nio/charset/Charset;)Lio/ktor/http/ContentType;
 }
 
-public final class io/ktor/http/Cookie {
+public final class io/ktor/http/Cookie : java/io/Serializable {
+	public static final field Companion Lio/ktor/http/Cookie$Companion;
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;Lio/ktor/http/CookieEncoding;Ljava/lang/Integer;Lio/ktor/util/date/GMTDate;Ljava/lang/String;Ljava/lang/String;ZZLjava/util/Map;)V
 	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lio/ktor/http/CookieEncoding;Ljava/lang/Integer;Lio/ktor/util/date/GMTDate;Ljava/lang/String;Ljava/lang/String;ZZLjava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
@@ -290,6 +292,20 @@ public final class io/ktor/http/Cookie {
 	public final fun getValue ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public synthetic class io/ktor/http/Cookie$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lio/ktor/http/Cookie$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lio/ktor/http/Cookie;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lio/ktor/http/Cookie;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+}
+
+public final class io/ktor/http/Cookie$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
 public final class io/ktor/http/CookieEncoding : java/lang/Enum {
@@ -950,7 +966,7 @@ public final class io/ktor/http/URLParserKt {
 	public static final fun takeFrom (Lio/ktor/http/URLBuilder;Ljava/lang/String;)Lio/ktor/http/URLBuilder;
 }
 
-public final class io/ktor/http/URLProtocol {
+public final class io/ktor/http/URLProtocol : java/io/Serializable {
 	public static final field Companion Lio/ktor/http/URLProtocol$Companion;
 	public fun <init> (Ljava/lang/String;I)V
 	public final fun component1 ()Ljava/lang/String;
@@ -1010,7 +1026,7 @@ public final class io/ktor/http/UnsafeHeaderException : java/lang/IllegalArgumen
 	public fun <init> (Ljava/lang/String;)V
 }
 
-public final class io/ktor/http/Url {
+public final class io/ktor/http/Url : java/io/Serializable {
 	public static final field Companion Lio/ktor/http/Url$Companion;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getEncodedFragment ()Ljava/lang/String;
@@ -1027,6 +1043,8 @@ public final class io/ktor/http/Url {
 	public final fun getPort ()I
 	public final fun getProtocol ()Lio/ktor/http/URLProtocol;
 	public final fun getProtocolOrNull ()Lio/ktor/http/URLProtocol;
+	public final fun getRawSegments ()Ljava/util/List;
+	public final fun getSegments ()Ljava/util/List;
 	public final fun getSpecifiedPort ()I
 	public final fun getTrailingQuery ()Z
 	public final fun getUser ()Ljava/lang/String;
@@ -1035,11 +1053,21 @@ public final class io/ktor/http/Url {
 }
 
 public final class io/ktor/http/Url$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
 public final class io/ktor/http/UrlKt {
 	public static final fun getAuthority (Lio/ktor/http/Url;)Ljava/lang/String;
 	public static final fun getProtocolWithAuthority (Lio/ktor/http/Url;)Ljava/lang/String;
+}
+
+public final class io/ktor/http/UrlSerializer : kotlinx/serialization/KSerializer {
+	public static final field INSTANCE Lio/ktor/http/UrlSerializer;
+	public fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lio/ktor/http/Url;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public fun serialize (Lkotlinx/serialization/encoding/Encoder;Lio/ktor/http/Url;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
 }
 
 public final class io/ktor/http/auth/AuthScheme {
@@ -1222,6 +1250,7 @@ public final class io/ktor/http/content/MultipartJvmKt {
 }
 
 public final class io/ktor/http/content/MultipartKt {
+	public static final fun asFlow (Lio/ktor/http/content/MultiPartData;)Lkotlinx/coroutines/flow/Flow;
 	public static final fun forEachPart (Lio/ktor/http/content/MultiPartData;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static final fun readAllParts (Lio/ktor/http/content/MultiPartData;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
@@ -1376,6 +1405,29 @@ public final class io/ktor/http/content/WriterContent : io/ktor/http/content/Out
 	public fun getContentType ()Lio/ktor/http/ContentType;
 	public fun getStatus ()Lio/ktor/http/HttpStatusCode;
 	public fun writeTo (Lio/ktor/utils/io/ByteWriteChannel;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class io/ktor/http/header/AcceptEncoding : io/ktor/http/HeaderValueWithParameters {
+	public static final field Companion Lio/ktor/http/header/AcceptEncoding$Companion;
+	public fun <init> (Ljava/lang/String;D)V
+	public fun <init> (Ljava/lang/String;Ljava/util/List;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAcceptEncoding ()Ljava/lang/String;
+	public fun hashCode ()I
+	public final fun match (Lio/ktor/http/header/AcceptEncoding;)Z
+	public final fun withQValue (D)Lio/ktor/http/header/AcceptEncoding;
+}
+
+public final class io/ktor/http/header/AcceptEncoding$Companion {
+	public final fun getAll ()Lio/ktor/http/header/AcceptEncoding;
+	public final fun getBr ()Lio/ktor/http/header/AcceptEncoding;
+	public final fun getCompress ()Lio/ktor/http/header/AcceptEncoding;
+	public final fun getDeflate ()Lio/ktor/http/header/AcceptEncoding;
+	public final fun getGzip ()Lio/ktor/http/header/AcceptEncoding;
+	public final fun getIdentity ()Lio/ktor/http/header/AcceptEncoding;
+	public final fun getZstd ()Lio/ktor/http/header/AcceptEncoding;
+	public final fun mergeAcceptEncodings ([Lio/ktor/http/header/AcceptEncoding;)Ljava/lang/String;
 }
 
 public final class io/ktor/http/parsing/ParseException : java/lang/IllegalArgumentException {

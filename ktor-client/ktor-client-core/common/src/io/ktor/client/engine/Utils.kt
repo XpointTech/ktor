@@ -13,10 +13,10 @@ import kotlinx.coroutines.*
 import kotlin.coroutines.*
 
 /**
- * Default user agent to use in ktor client.
+ * Default user agent to use in a Ktor client.
  */
 @InternalAPI
-public val KTOR_DEFAULT_USER_AGENT: String = "Ktor client"
+public val KTOR_DEFAULT_USER_AGENT: String = "ktor-client"
 
 private val DATE_HEADERS = setOf(
     HttpHeaders.Date,
@@ -83,7 +83,7 @@ internal class KtorCallContextElement(val callContext: CoroutineContext) : Corou
     override val key: CoroutineContext.Key<*>
         get() = KtorCallContextElement
 
-    public companion object : CoroutineContext.Key<KtorCallContextElement>
+    companion object : CoroutineContext.Key<KtorCallContextElement>
 }
 
 /**

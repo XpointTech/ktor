@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2023 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
+ * Copyright 2014-2024 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
  */
 
 package io.ktor.server.plugins.calllogging
@@ -21,6 +21,7 @@ import io.ktor.server.testing.*
 import io.ktor.util.logging.Logger
 import kotlinx.coroutines.*
 import kotlinx.coroutines.slf4j.*
+import kotlinx.coroutines.test.*
 import org.fusesource.jansi.*
 import org.slf4j.*
 import org.slf4j.event.*
@@ -63,10 +64,10 @@ class CallLoggingTest {
     }
 
     @Test
-    fun `can log application lifecycle events`() {
+    fun `can log application lifecycle events`() = runTest {
         var hash: String? = null
 
-        testApplication {
+        runTestApplication {
             environment { environment() }
             application {
                 install(CallLogging) { clock { 0 } }
@@ -76,19 +77,13 @@ class CallLoggingTest {
 
         assertTrue(messages.size >= 3, "It should be at least 3 message logged:\n$messages")
         val startingMessageIndex = messages.indexOfFirst {
-            it.startsWith(
-                "INFO: Application started: class io.ktor.server.application.Application(0x$hash)"
-            )
+            it == "INFO: Application started: io.ktor.server.application.Application@$hash"
         }
         val stoppingMessageIndex = messages.indexOfFirst {
-            it.startsWith(
-                "INFO: Application stopping: class io.ktor.server.application.Application(0x$hash)"
-            )
+            it == "INFO: Application stopping: io.ktor.server.application.Application@$hash"
         }
         val stoppedMessageIndex = messages.indexOfFirst {
-            it.startsWith(
-                "INFO: Application stopped: class io.ktor.server.application.Application(0x$hash)"
-            )
+            it == "INFO: Application stopped: io.ktor.server.application.Application@$hash"
         }
         assertTrue { startingMessageIndex >= 0 }
         assertTrue { startingMessageIndex < stoppingMessageIndex }
@@ -394,7 +389,7 @@ class CallLoggingTest {
     }
 
     @Test
-    fun `can configure custom logger`() {
+    fun `can configure custom logger`() = runTest {
         val customMessages = ArrayList<String>()
         val customLogger: Logger = object : Logger by LoggerFactory.getLogger("ktor.test.custom") {
             override fun info(message: String?) {
@@ -405,7 +400,7 @@ class CallLoggingTest {
         }
         lateinit var hash: String
 
-        testApplication {
+        runTestApplication {
             application {
                 install(CallLogging) {
                     this.logger = customLogger
@@ -525,9 +520,10 @@ class CallLoggingTest {
 
         client.get("/").apply {
             assertEquals(HttpStatusCode.BadRequest, status)
+            @Suppress("ktlint:standard:max-line-length")
             assertContains(
                 messages,
-                "DEBUG: Unhandled: GET - /. Exception class io.ktor.server.plugins.BadRequestException: Message of exception" // ktlint-disable max-line-length
+                "DEBUG: Unhandled: GET - /. Exception class io.ktor.server.plugins.BadRequestException: Message of exception"
             )
         }
     }

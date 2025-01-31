@@ -10,7 +10,6 @@ import java.util.*
 import java.util.concurrent.*
 import java.util.concurrent.locks.*
 import kotlin.concurrent.*
-import kotlin.coroutines.*
 
 internal interface CacheReference<out K> {
     val key: K
@@ -21,8 +20,16 @@ internal open class ReferenceCache<K : Any, V : Any, out R>(
     val wrapFunction: (K, V, ReferenceQueue<V>) -> R
 ) : Cache<K, V> where R : Reference<V>, R : CacheReference<K> {
     private val queue = ReferenceQueue<V>()
-    private val container = BaseCache { key: K -> forkThreadIfNeeded(); wrapFunction(key, calc(key), queue) }
-    private val workerThread by lazy { Thread(ReferenceWorker(container, queue)).apply { isDaemon = true; start() } }
+    private val container = BaseCache { key: K ->
+        forkThreadIfNeeded()
+        wrapFunction(key, calc(key), queue)
+    }
+    private val workerThread by lazy {
+        Thread(ReferenceWorker(container, queue)).apply {
+            isDaemon = true
+            start()
+        }
+    }
 
     override suspend fun getOrCompute(key: K): V {
         val ref = container.getOrCompute(key)
@@ -63,7 +70,7 @@ internal open class ReferenceCache<K : Any, V : Any, out R>(
     }
 }
 
-private class ReferenceWorker<out K : Any, R : CacheReference<K>> constructor(
+private class ReferenceWorker<out K : Any, R : CacheReference<K>>(
     owner: Cache<K, R>,
     val queue: ReferenceQueue<*>
 ) : Runnable {
@@ -86,17 +93,10 @@ private class ReferenceWorker<out K : Any, R : CacheReference<K>> constructor(
 internal class CacheSoftReference<out K, V>(override val key: K, value: V, queue: ReferenceQueue<V>) :
     SoftReference<V>(value, queue), CacheReference<K>
 
-internal class CacheWeakReference<out K, V>(override val key: K, value: V, queue: ReferenceQueue<V>) :
-    WeakReference<V>(value, queue), CacheReference<K>
-
 internal class SoftReferenceCache<K : Any, V : Any>(calc: suspend (K) -> V) :
     ReferenceCache<K, V, CacheSoftReference<K, V>>(calc, { k, v, q -> CacheSoftReference(k, v, q) })
 
-internal class WeakReferenceCache<K : Any, V : Any>(
-    calc: suspend (K) -> V
-) : ReferenceCache<K, V, CacheWeakReference<K, V>>(calc, { k, v, q -> CacheWeakReference(k, v, q) })
-
-internal class BaseTimeoutCache<in K : Any, V : Any> constructor(
+internal class BaseTimeoutCache<in K : Any, V : Any>(
     private val timeoutValue: Long,
     private val touchOnGet: Boolean,
     private val delegate: Cache<K, V>
@@ -108,7 +108,10 @@ internal class BaseTimeoutCache<in K : Any, V : Any> constructor(
     private val map = WeakHashMap<K, KeyState<K>>()
 
     private val workerThread by lazy {
-        Thread(TimeoutWorker(this, lock, cond, items)).apply { isDaemon = true; start() }
+        Thread(TimeoutWorker(this, lock, cond, items)).apply {
+            isDaemon = true
+            start()
+        }
     }
 
     override suspend fun getOrCompute(key: K): V {

@@ -1,42 +1,21 @@
 /*
- * Copyright 2014-2020 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
+ * Copyright 2014-2025 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
  */
 
 pluginManagement {
-    repositories {
-        mavenCentral()
-        google()
-        gradlePluginPortal()
-    }
+    includeBuild("build-settings-logic")
+}
+
+plugins {
+    id("org.gradle.toolchains.foojay-resolver-convention") version "0.9.0"
+    id("conventions-dependency-resolution-management")
+    id("conventions-develocity")
 }
 
 rootProject.name = "ktor"
 
-val native_targets_enabled = !extra.has("disable_native_targets")
-val CACHE_USER = System.getenv("GRADLE_CACHE_USER")
-
-if (CACHE_USER != null) {
-    val CACHE_PASSWORD = System.getenv("GRADLE_CACHE_PASSWORD")
-    buildCache {
-        remote(HttpBuildCache::class) {
-            isPush = true
-            setUrl("https://ktor-gradle-cache.teamcity.com/cache/")
-            credentials {
-                username = CACHE_USER
-                password = CACHE_PASSWORD
-            }
-        }
-    }
-}
-
-val fullVersion = System.getProperty("java.version", "8.0.0")
-val versionComponents = fullVersion
-    .split(".")
-    .take(2)
-    .filter { it.isNotBlank() }
-    .map { Integer.parseInt(it) }
-
-val currentJdk = if (versionComponents[0] == 1) versionComponents[1] else versionComponents[0]
+includeBuild("build-logic")
+includeBuild("ktor-test-server")
 
 include(":ktor-server")
 include(":ktor-server:ktor-server-core")
@@ -48,33 +27,30 @@ include(":ktor-server:ktor-server-test-base")
 include(":ktor-server:ktor-server-test-suites")
 include(":ktor-server:ktor-server-jetty")
 include(":ktor-server:ktor-server-jetty:ktor-server-jetty-test-http2")
+include(":ktor-server:ktor-server-jetty-jakarta")
+include(":ktor-server:ktor-server-jetty-jakarta:ktor-server-jetty-test-http2-jakarta")
 include(":ktor-server:ktor-server-servlet")
+include(":ktor-server:ktor-server-servlet-jakarta")
 include(":ktor-server:ktor-server-tomcat")
+include(":ktor-server:ktor-server-tomcat-jakarta")
 include(":ktor-server:ktor-server-netty")
 include(":ktor-server:ktor-server-cio")
 include(":ktor-client")
 include(":ktor-client:ktor-client-core")
+include(":ktor-client:ktor-client-test-base")
 include(":ktor-client:ktor-client-tests")
 include(":ktor-client:ktor-client-apache")
 include(":ktor-client:ktor-client-apache5")
 include(":ktor-client:ktor-client-android")
 include(":ktor-client:ktor-client-cio")
-if (native_targets_enabled) {
-    include(":ktor-client:ktor-client-curl")
-    include(":ktor-client:ktor-client-ios")
-    include(":ktor-client:ktor-client-darwin")
-    include(":ktor-client:ktor-client-darwin-legacy")
-    include(":ktor-client:ktor-client-winhttp")
-}
-if (currentJdk >= 11) {
-    include(":ktor-client:ktor-client-java")
-    include(":ktor-client:ktor-client-jetty-jakarta")
-    include(":ktor-server:ktor-server-servlet-jakarta")
-    include(":ktor-server:ktor-server-jetty-jakarta")
-    include(":ktor-server:ktor-server-jetty-jakarta:ktor-server-jetty-test-http2-jakarta")
-    include(":ktor-server:ktor-server-tomcat-jakarta")
-}
+include(":ktor-client:ktor-client-curl")
+include(":ktor-client:ktor-client-ios")
+include(":ktor-client:ktor-client-darwin")
+include(":ktor-client:ktor-client-darwin-legacy")
+include(":ktor-client:ktor-client-winhttp")
+include(":ktor-client:ktor-client-java")
 include(":ktor-client:ktor-client-jetty")
+include(":ktor-client:ktor-client-jetty-jakarta")
 include(":ktor-client:ktor-client-js")
 include(":ktor-client:ktor-client-mock")
 include(":ktor-client:ktor-client-okhttp")
@@ -160,5 +136,5 @@ include(":ktor-shared:ktor-events")
 include(":ktor-shared:ktor-websocket-serialization")
 include(":ktor-shared:ktor-websockets")
 include(":ktor-shared:ktor-sse")
-include(":ktor-shared:ktor-junit")
+include(":ktor-shared:ktor-test-base")
 include(":ktor-java-modules-test")

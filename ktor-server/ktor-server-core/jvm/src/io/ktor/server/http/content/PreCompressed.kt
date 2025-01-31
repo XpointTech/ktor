@@ -28,7 +28,7 @@ public enum class CompressedFileType(public val extension: String, public val en
 
 internal val compressedKey = AttributeKey<List<CompressedFileType>>("StaticContentCompressed")
 
-internal val Routing.staticContentEncodedTypes: List<CompressedFileType>?
+internal val Route.staticContentEncodedTypes: List<CompressedFileType>?
     get() = attributes.getOrNull(compressedKey) ?: parent?.staticContentEncodedTypes
 
 internal class PreCompressedResponse(
@@ -66,7 +66,7 @@ internal fun bestCompressionFit(
 }
 
 internal fun bestCompressionFit(
-    fileSystem: FileSystem,
+    fileSystem: FileSystemPaths,
     path: Path,
     acceptEncoding: List<HeaderValue>,
     compressedTypes: List<CompressedFileType>?
@@ -139,7 +139,7 @@ internal suspend fun ApplicationCall.respondStaticFile(
 }
 
 internal suspend fun ApplicationCall.respondStaticPath(
-    fileSystem: FileSystem,
+    fileSystem: FileSystemPaths,
     requestedPath: Path,
     compressedTypes: List<CompressedFileType>?,
     contentType: (Path) -> ContentType = { ContentType.defaultForPath(it) },

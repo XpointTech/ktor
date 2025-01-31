@@ -1,17 +1,21 @@
 /*
- * Copyright 2014-2024 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
+ * Copyright 2014-2025 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
  */
 
-// ktlint-disable filename
 package io.ktor.server.test.base
 
-import io.ktor.junit.*
-import kotlinx.coroutines.*
-import kotlinx.coroutines.debug.junit5.*
-import org.junit.jupiter.api.*
-import java.lang.reflect.*
+import io.ktor.test.*
+import io.ktor.test.dispatcher.*
+import io.ktor.test.junit.*
+import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.debug.junit5.CoroutinesTimeout
+import kotlinx.coroutines.test.TestResult
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.TestInfo
+import java.lang.reflect.Method
 import java.util.*
-import kotlin.time.*
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 @CoroutinesTimeout(5 * 60 * 1000)
@@ -31,16 +35,30 @@ actual abstract class BaseTest actual constructor() {
         testName = method.map { it.name }.orElse(testInfo.displayName)
     }
 
-    @AfterEach
-    fun throwErrors() {
+    actual open fun afterTest() {
         errorCollector.throwErrorIfPresent()
+    }
+
+    actual open fun beforeTest() {
     }
 
     actual fun collectUnhandledException(error: Throwable) {
         errorCollector += error
     }
 
-    actual fun runTest(block: suspend CoroutineScope.() -> Unit) {
-        runBlocking(CoroutineName("test-$testName"), block)
+    actual fun runTest(
+        timeout: Duration,
+        retries: Int,
+        block: suspend CoroutineScope.() -> Unit
+    ): TestResult = retryTest(retries) { retry ->
+        runTestWithRealTime(CoroutineName("test-$testName"), timeout) {
+            if (retry > 0) println("[Retry $retry/$retries]")
+            beforeTest()
+            try {
+                block()
+            } finally {
+                afterTest()
+            }
+        }
     }
 }

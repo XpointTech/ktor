@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2022 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
+ * Copyright 2014-2024 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
  */
 
 package io.ktor.server.plugins.swagger
@@ -21,7 +21,7 @@ import java.io.*
  * the file system using [java.io.File].
  *
  */
-public fun Routing.swaggerUI(
+public fun Route.swaggerUI(
     path: String,
     swaggerFile: String = "openapi/documentation.yaml",
     block: SwaggerConfig.() -> Unit = {}
@@ -40,7 +40,7 @@ public fun Routing.swaggerUI(
 /**
  * Creates a `get` endpoint with [SwaggerUI] at [path] rendered from the [apiFile].
  */
-public fun Routing.swaggerUI(path: String, apiFile: File, block: SwaggerConfig.() -> Unit = {}) {
+public fun Route.swaggerUI(path: String, apiFile: File, block: SwaggerConfig.() -> Unit = {}) {
     if (!apiFile.exists()) {
         throw FileNotFoundException("Swagger file not found: ${apiFile.absolutePath}")
     }
@@ -49,7 +49,17 @@ public fun Routing.swaggerUI(path: String, apiFile: File, block: SwaggerConfig.(
     swaggerUI(path, apiFile.name, content, block)
 }
 
-internal fun Routing.swaggerUI(
+/**
+ * Configures a route to serve Swagger UI and its corresponding API specification.
+ *
+ * This function sets up a given path to serve a Swagger UI interface based on the provided API specification.
+ *
+ * @param path The base path where the Swagger UI will be accessible.
+ * @param apiUrl The relative URL for the Swagger API JSON file.
+ * @param api The content of the Swagger API specification.
+ * @param block A configuration block to apply additional Swagger configuration settings.
+ */
+public fun Route.swaggerUI(
     path: String,
     apiUrl: String,
     api: String,
@@ -76,6 +86,11 @@ internal fun Routing.swaggerUI(
                     config.customStyle?.let {
                         link(href = it, rel = "stylesheet")
                     }
+                    link(
+                        href = config.faviconLocation,
+                        rel = "icon",
+                        type = "image/x-icon"
+                    )
                 }
                 body {
                     div { id = "swagger-ui" }
@@ -95,6 +110,7 @@ window.onload = function() {
     window.ui = SwaggerUIBundle({
         url: '$fullPath/$apiUrl',
         dom_id: '#swagger-ui',
+        deepLinking: ${config.deepLinking},
         presets: [
             SwaggerUIBundle.presets.apis,
             SwaggerUIStandalonePreset

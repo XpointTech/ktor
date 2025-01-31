@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2019 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
+ * Copyright 2014-2025 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
  */
 
 package io.ktor.client.engine.js
@@ -16,10 +16,12 @@ import io.ktor.util.*
 import io.ktor.util.date.*
 import io.ktor.utils.io.*
 import kotlinx.coroutines.*
-import kotlinx.coroutines.CancellationException
-import org.w3c.dom.*
-import org.w3c.dom.events.*
-import kotlin.coroutines.*
+import org.w3c.dom.WebSocket
+import org.w3c.dom.events.Event
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlin.js.Promise
 
 internal class JsClientEngine(
     override val config: JsClientEngineConfig,
@@ -31,7 +33,7 @@ internal class JsClientEngine(
         check(config.proxy == null) { "Proxy unsupported in Js engine." }
     }
 
-    @OptIn(InternalAPI::class, InternalCoroutinesApi::class)
+    @OptIn(InternalAPI::class)
     override suspend fun execute(data: HttpRequestData): HttpResponseData {
         val callContext = callContext()
         val clientConfig = data.attributes[CLIENT_CONFIG]
@@ -42,17 +44,10 @@ internal class JsClientEngine(
 
         val requestTime = GMTDate()
         val rawRequest = data.toRaw(clientConfig, callContext)
-
-        val controller = AbortController()
-        rawRequest.signal = controller.signal
-        callContext.job.invokeOnCompletion(onCancelling = true) {
-            controller.abort()
-        }
-
-        val rawResponse = commonFetch(data.url.toString(), rawRequest, config)
+        val rawResponse = commonFetch(data.url.toString(), rawRequest, config, callContext.job)
 
         val status = HttpStatusCode(rawResponse.status.toInt(), rawResponse.statusText)
-        val headers = rawResponse.headers.mapToKtor()
+        val headers = rawResponse.headers.mapToKtor(data.method, data.attributes)
         val version = HttpProtocolVersion.HTTP_1_1
 
         val body = CoroutineScope(callContext).readBody(rawResponse)
@@ -73,18 +68,19 @@ internal class JsClientEngine(
     // Adding "_capturingHack" to reduce chances of JS IR backend to rename variable,
     // so it can be accessed inside js("") function
     @Suppress("UNUSED_PARAMETER", "UnsafeCastFromDynamic", "UNUSED_VARIABLE", "LocalVariableName")
-    private fun createWebSocket(
+    private suspend fun createWebSocket(
         urlString_capturingHack: String,
         headers: Headers
     ): WebSocket {
         val protocolHeaderNames = headers.names().filter { headerName ->
-            headerName.equals("sec-websocket-protocol", true)
+            headerName.equals(HttpHeaders.SecWebSocketProtocol, ignoreCase = true)
         }
         val protocols = protocolHeaderNames.mapNotNull { headers.getAll(it) }.flatten().toTypedArray()
-        return when (PlatformUtils.platform) {
-            Platform.Browser -> js("new WebSocket(urlString_capturingHack, protocols)")
+        return when {
+            PlatformUtils.IS_BROWSER -> js("new WebSocket(urlString_capturingHack, protocols)")
             else -> {
-                val ws_capturingHack = js("eval('require')('ws')")
+                val ws_import: Promise<dynamic> = js("import('ws')")
+                val ws_capturingHack = ws_import.await().default
                 val headers_capturingHack: dynamic = object {}
                 headers.forEach { name, values ->
                     headers_capturingHack[name] = values.joinToString(",")
@@ -112,10 +108,13 @@ internal class JsClientEngine(
             throw cause
         }
 
+        val protocol = socket.protocol.takeIf { it.isNotEmpty() }
+        val headers = if (protocol != null) headersOf(HttpHeaders.SecWebSocketProtocol, protocol) else Headers.Empty
+
         return HttpResponseData(
             HttpStatusCode.SwitchingProtocols,
             requestTime,
-            Headers.Empty,
+            headers,
             HttpProtocolVersion.HTTP_1_1,
             session,
             callContext
@@ -152,12 +151,13 @@ private fun Event.asString(): String = buildString {
     append(JSON.stringify(this@asString, arrayOf("message", "target", "type", "isTrusted")))
 }
 
-private fun org.w3c.fetch.Headers.mapToKtor(): Headers = buildHeaders {
+@OptIn(InternalAPI::class)
+private fun org.w3c.fetch.Headers.mapToKtor(method: HttpMethod, attributes: Attributes): Headers = buildHeaders {
     this@mapToKtor.asDynamic().forEach { value: String, key: String ->
         append(key, value)
     }
 
-    Unit
+    dropCompressionHeaders(method, attributes)
 }
 
 /**

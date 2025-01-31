@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2019 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
+ * Copyright 2014-2025 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
  */
 
 package io.ktor.client.engine.cio
@@ -9,6 +9,7 @@ import io.ktor.client.network.sockets.*
 import io.ktor.client.plugins.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
+import io.ktor.client.test.base.*
 import io.ktor.client.tests.utils.*
 import io.ktor.http.*
 import io.ktor.http.content.*
@@ -16,12 +17,13 @@ import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import kotlinx.coroutines.*
-import kotlinx.coroutines.debug.junit5.*
-import java.nio.channels.*
+import io.mockk.mockkStatic
+import io.mockk.verify
+import kotlinx.coroutines.debug.junit5.CoroutinesTimeout
+import kotlinx.coroutines.delay
+import java.net.InetAddress
+import java.nio.channels.UnresolvedAddressException
 import kotlin.test.*
-import kotlin.test.Ignore
-import kotlin.test.Test
 
 @CoroutinesTimeout(60_000)
 class CIORequestTest : TestWithKtor() {
@@ -156,6 +158,16 @@ class CIORequestTest : TestWithKtor() {
             assertNotNull(fail)
             if (fail !is ConnectTimeoutException && fail !is UnresolvedAddressException) {
                 fail("Expected ConnectTimeoutException or UnresolvedAddressException, got $fail", fail)
+            }
+        }
+    }
+
+    @Test
+    fun testInetAddressRetrievedOnce() = testWithEngine(CIO) {
+        test { client ->
+            mockkStatic(InetAddress::getByName) {
+                client.prepareGet { url(path = "/echo", port = serverPort) }.execute()
+                verify(exactly = 1) { InetAddress.getByName(any()) }
             }
         }
     }

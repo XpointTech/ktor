@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2023 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
+ * Copyright 2014-2024 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
  */
 
 package io.ktor.server.servlet.jakarta
@@ -16,7 +16,6 @@ import java.io.*
 import java.lang.reflect.*
 import kotlin.coroutines.*
 
-@Suppress("KDocMissingDocumentation")
 public open class AsyncServletApplicationCall(
     application: Application,
     servletRequest: HttpServletRequest,
@@ -53,7 +52,6 @@ public open class AsyncServletApplicationCall(
     }
 }
 
-@Suppress("KDocMissingDocumentation")
 public class AsyncServletApplicationRequest(
     call: PipelineCall,
     servletRequest: HttpServletRequest,
@@ -66,7 +64,9 @@ public class AsyncServletApplicationRequest(
         if (!upgraded) {
             val contentLength = servletRequest.contentLength
             servletReader(servletRequest.inputStream, contentLength).channel
-        } else ByteReadChannel.Empty
+        } else {
+            ByteReadChannel.Empty
+        }
     }
 
     override val engineReceiveChannel: ByteReadChannel get() = inputStreamChannel
@@ -86,7 +86,6 @@ public open class AsyncServletApplicationResponse(
     override val coroutineContext: CoroutineContext,
     managedByEngineHeaders: Set<String> = emptySet()
 ) : ServletApplicationResponse(call, servletResponse, managedByEngineHeaders), CoroutineScope {
-    @Suppress("DEPRECATION")
     override fun createResponseJob(): ReaderJob =
         servletWriter(servletResponse.outputStream)
 

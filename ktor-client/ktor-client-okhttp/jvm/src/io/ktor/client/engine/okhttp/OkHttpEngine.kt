@@ -24,7 +24,6 @@ import okio.*
 import java.util.concurrent.*
 import kotlin.coroutines.*
 
-@Suppress("KDocMissingDocumentation")
 @OptIn(InternalAPI::class, DelicateCoroutinesApi::class)
 public class OkHttpEngine(override val config: OkHttpConfig) : HttpClientEngineBase("ktor-okhttp") {
 
@@ -45,7 +44,6 @@ public class OkHttpEngine(override val config: OkHttpConfig) : HttpClientEngineB
         requestsJob = SilentSupervisor(parent)
         coroutineContext = super.coroutineContext + requestsJob
 
-        @OptIn(ExperimentalCoroutinesApi::class)
         GlobalScope.launch(super.coroutineContext, start = CoroutineStart.ATOMIC) {
             try {
                 requestsJob[Job]!!.join()
@@ -117,7 +115,7 @@ public class OkHttpEngine(override val config: OkHttpConfig) : HttpClientEngineB
         requestData: HttpRequestData
     ): HttpResponseData {
         val requestTime = GMTDate()
-        val response = engine.execute(engineRequest, requestData)
+        val response = engine.execute(engineRequest, requestData, callContext)
 
         val body = response.body
         callContext[Job]!!.invokeOnCompletion { body?.close() }
@@ -163,7 +161,7 @@ public class OkHttpEngine(override val config: OkHttpConfig) : HttpClientEngineB
     }
 }
 
-@OptIn(DelicateCoroutinesApi::class)
+@OptIn(DelicateCoroutinesApi::class, InternalCoroutinesApi::class)
 private fun BufferedSource.toChannel(context: CoroutineContext, requestData: HttpRequestData): ByteReadChannel =
     GlobalScope.writer(context) {
         use { source ->
@@ -173,7 +171,9 @@ private fun BufferedSource.toChannel(context: CoroutineContext, requestData: Htt
                     lastRead = try {
                         source.read(buffer)
                     } catch (cause: Throwable) {
-                        throw mapExceptions(cause, requestData)
+                        val cancelOrCloseCause =
+                            kotlin.runCatching { context.job.getCancellationException() }.getOrNull() ?: cause
+                        throw mapExceptions(cancelOrCloseCause, requestData)
                     }
                 }
                 channel.flush()
@@ -216,10 +216,12 @@ internal fun OutgoingContent.convertToOkHttpBody(callContext: CoroutineContext):
     is OutgoingContent.ByteArrayContent -> bytes().let {
         it.toRequestBody(contentType.toString().toMediaTypeOrNull(), 0, it.size)
     }
+
     is OutgoingContent.ReadChannelContent -> StreamRequestBody(contentLength) { readFrom() }
     is OutgoingContent.WriteChannelContent -> {
         StreamRequestBody(contentLength) { GlobalScope.writer(callContext) { writeTo(channel) }.channel }
     }
+
     is OutgoingContent.NoContent -> ByteArray(0).toRequestBody(null, 0, 0)
     is OutgoingContent.ContentWrapper -> delegate().convertToOkHttpBody(callContext)
     is OutgoingContent.ProtocolUpgrade -> throw UnsupportedContentTypeException(this)
