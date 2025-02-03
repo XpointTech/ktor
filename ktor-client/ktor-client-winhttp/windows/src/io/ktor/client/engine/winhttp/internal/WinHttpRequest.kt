@@ -22,7 +22,7 @@ import kotlin.coroutines.*
 internal class WinHttpRequest @OptIn(ExperimentalForeignApi::class) constructor(
     hSession: COpaquePointer,
     data: HttpRequestData,
-    config: WinHttpClientEngineConfig
+    private val config: WinHttpClientEngineConfig
 ) : Closeable {
     private val connect: WinHttpConnect
 
@@ -136,6 +136,7 @@ internal class WinHttpRequest @OptIn(ExperimentalForeignApi::class) constructor(
             if (WinHttpReceiveResponse(hRequest, null) == 0) {
                 throw getWinHttpException(ERROR_FAILED_TO_RECEIVE_RESPONSE)
             }
+            config.challengeHandler?.invoke(hRequest)
         }
     }
 
