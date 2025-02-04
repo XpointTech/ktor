@@ -36,13 +36,13 @@ public class WinHttpClientEngineConfig : HttpClientEngineConfig() {
     /**
      * Handles the challenge of HTTP responses.
      */
-    internal var challengeHandler: ChallengeHandler? = null
+    public var challengeHandler: ChallengeHandler? = null
 
     /**
      * Sets the [block] as an HTTP request challenge handler.
      */
     @OptIn(ExperimentalForeignApi::class)
-    internal fun handleChallenge(block: ChallengeHandler) {
+    public fun handleChallenge(block: ChallengeHandler) {
         challengeHandler = block
     }
 }

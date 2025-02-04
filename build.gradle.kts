@@ -60,7 +60,7 @@ plugins {
 }
 
 subprojects {
-    group = "io.ktor"
+    group = "io.github.xpointtech"
     version = configuredVersion
     extra["hostManager"] = HostManager()
 

@@ -13,8 +13,10 @@ kotlin {
     sourceSets {
         windowsMain {
             dependencies {
-                api(project(":ktor-client:ktor-client-core"))
-                api(project(":ktor-http:ktor-http-cio"))
+                //api(project(":ktor-client:ktor-client-core"))
+                implementation("io.ktor:ktor-client-core:3.0.2")
+                //api(project(":ktor-http:ktor-http-cio"))
+                implementation("io.ktor:ktor-http-cio:3.0.2")
             }
         }
         windowsTest {

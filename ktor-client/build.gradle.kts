@@ -6,7 +6,7 @@ kotlin {
     sourceSets {
         commonMain {
             dependencies {
-                api(project(":ktor-client:ktor-client-core"))
+                implementation("io.ktor:ktor-client-core:3.0.2")
             }
         }
     }
