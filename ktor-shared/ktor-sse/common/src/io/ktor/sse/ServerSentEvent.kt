@@ -9,6 +9,9 @@ import io.ktor.utils.io.*
 /**
  *  Server-sent event interface.
  *
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.sse.ServerSentEventMetadata)
+ *
  *  @property data data field of the event.
  *  @property event string identifying the type of event.
  *  @property id event ID.
@@ -28,6 +31,9 @@ public sealed interface ServerSentEventMetadata<T> {
 
 /**
  *  Server-sent event.
+ *
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.sse.ServerSentEvent)
  *
  *  @property data data field of the event.
  *  @property event string identifying the type of event.
@@ -50,6 +56,9 @@ public data class ServerSentEvent(
 /**
  *  Server-sent event with generic parameter [data].
  *
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.sse.TypedServerSentEvent)
+ *
  *  @property data data field of the event.
  *  @property event string identifying the type of event.
  *  @property id event ID.
@@ -70,10 +79,14 @@ public data class TypedServerSentEvent<T>(
         eventToString(data?.let { serializer(it) }, event, id, retry, comments)
 }
 
+/**
+ * Serialize [event](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#event_stream_format)
+ * to a string representation
+ */
 private fun eventToString(data: String?, event: String?, id: String?, retry: Long?, comments: String?): String {
     return buildString {
-        appendField("data", data)
         appendField("event", event)
+        appendField("data", data)
         appendField("id", id)
         appendField("retry", retry)
         appendField("", comments)

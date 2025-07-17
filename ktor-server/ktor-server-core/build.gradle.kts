@@ -6,44 +6,41 @@ import ktorbuild.createCInterop
 
 description = ""
 
+plugins {
+    id("ktorbuild.project.library")
+    id("kotlinx-serialization")
+}
+
 kotlin {
-    createCInterop("host_common", sourceSet = "posix")
+    createCInterop("host_common", sourceSet = "nix")
 
     sourceSets {
-        commonMain {
-            dependencies {
-                api(project(":ktor-utils"))
-                api(project(":ktor-http"))
-                api(project(":ktor-shared:ktor-serialization"))
-                api(project(":ktor-shared:ktor-events"))
-                api(project(":ktor-http:ktor-http-cio"))
-                api(project(":ktor-shared:ktor-websockets"))
+        commonMain.dependencies {
+            api(projects.ktorUtils)
+            api(projects.ktorHttp)
+            api(projects.ktorSerialization)
+            api(projects.ktorEvents)
+            api(projects.ktorHttpCio)
+            api(projects.ktorWebsockets)
 
-                api(libs.kotlin.reflect)
-            }
+            api(libs.kotlin.reflect)
         }
 
-        jvmMain {
-            dependencies {
-                api(libs.typesafe.config)
-                implementation(libs.jansi)
-            }
+        jvmMain.dependencies {
+            api(libs.typesafe.config)
+            implementation(libs.jansi)
         }
 
-        commonTest {
-            dependencies {
-                api(project(":ktor-server:ktor-server-test-host"))
-            }
+        commonTest.dependencies {
+            api(projects.ktorServerTestHost)
         }
 
-        jvmTest {
-            dependencies {
-                implementation(project(":ktor-server:ktor-server-config-yaml"))
-                implementation(project(":ktor-server:ktor-server-test-base"))
-                implementation(project(":ktor-server:ktor-server-test-suites"))
+        jvmTest.dependencies {
+            implementation(projects.ktorServerConfigYaml)
+            implementation(projects.ktorServerTestBase)
+            implementation(projects.ktorServerTestSuites)
 
-                implementation(libs.mockk)
-            }
+            implementation(libs.mockk)
         }
     }
 }

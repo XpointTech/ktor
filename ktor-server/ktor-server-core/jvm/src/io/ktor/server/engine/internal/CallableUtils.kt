@@ -1,19 +1,25 @@
 /*
- * Copyright 2014-2021 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
+ * Copyright 2014-2025 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
  */
 
 package io.ktor.server.engine.internal
 
 import io.ktor.server.application.*
-import java.lang.reflect.*
-import kotlin.reflect.*
-import kotlin.reflect.full.*
-import kotlin.reflect.jvm.*
+import java.lang.reflect.InvocationTargetException
+import java.lang.reflect.Modifier
+import kotlin.reflect.KClass
+import kotlin.reflect.KFunction
+import kotlin.reflect.KParameter
+import kotlin.reflect.full.callSuspendBy
+import kotlin.reflect.full.functions
+import kotlin.reflect.jvm.javaType
+import kotlin.reflect.jvm.kotlinFunction
 
-internal fun executeModuleFunction(
+internal suspend fun executeModuleFunction(
     classLoader: ClassLoader,
     fqName: String,
-    application: Application
+    application: Application,
+    moduleInjector: ModuleParametersInjector
 ) {
     val name = fqName.lastIndexOfAny(".#".toCharArray())
 
@@ -27,23 +33,26 @@ internal fun executeModuleFunction(
         ?: throw ReloadingException("Module function cannot be found for the fully qualified name '$fqName'")
 
     val staticFunctions = clazz.methods
-        .filter { it.name == functionName && Modifier.isStatic(it.modifiers) }
+        .filter { Modifier.isStatic(it.modifiers) }
         .mapNotNull { it.kotlinFunction }
-        .filter { it.isApplicableFunction() }
+        .filter { it.name == functionName && it.isApplicableFunction() }
 
     staticFunctions.bestFunction()?.let { moduleFunction ->
         if (moduleFunction.parameters.none { it.kind == KParameter.Kind.INSTANCE }) {
-            callFunctionWithInjection(null, moduleFunction, application)
+            callFunctionWithInjection(null, moduleFunction, application, moduleInjector)
             return
         }
     }
 
     try {
         if (Function1::class.java.isAssignableFrom(clazz)) {
-            val constructor = clazz.declaredConstructors.single()
-            if (constructor.parameterCount != 0) {
-                throw ReloadingException("Module function with captured variables cannot be instantiated '$fqName'")
+            // Normally lambda has a single constructor, but this could change after R8/ProGuard optimizations
+            val constructors = clazz.declaredConstructors
+            if (constructors.isEmpty()) {
+                throw ReloadingException("Module function cannot be instantiated '$fqName'")
             }
+            val constructor = constructors.find { it.parameterCount == 0 }
+                ?: throw ReloadingException("Module function with captured variables cannot be instantiated '$fqName'")
 
             constructor.isAccessible = true
             @Suppress("UNCHECKED_CAST")
@@ -61,17 +70,18 @@ internal fun executeModuleFunction(
     kclass.functions
         .filter { it.name == functionName && it.isApplicableFunction() }
         .bestFunction()?.let { moduleFunction ->
-            val instance = createModuleContainer(kclass, application)
-            callFunctionWithInjection(instance, moduleFunction, application)
+            val instance = createModuleContainer(kclass, application, moduleInjector)
+            callFunctionWithInjection(instance, moduleFunction, application, moduleInjector)
             return
         }
 
     throw ClassNotFoundException("Module function cannot be found for the fully qualified name '$fqName'")
 }
 
-private fun createModuleContainer(
+private suspend fun createModuleContainer(
     applicationEntryClass: KClass<*>,
-    application: Application
+    application: Application,
+    moduleInjector: ModuleParametersInjector
 ): Any {
     val objectInstance = applicationEntryClass.objectInstance
     if (objectInstance != null) return objectInstance
@@ -83,41 +93,49 @@ private fun createModuleContainer(
     val constructor = constructors.bestFunction()
         ?: throw RuntimeException("There are no applicable constructors found in class $applicationEntryClass")
 
-    return callFunctionWithInjection(null, constructor, application)
+    return callFunctionWithInjection(null, constructor, application, moduleInjector)
 }
 
-private fun <R> callFunctionWithInjection(
+private suspend fun <R> callFunctionWithInjection(
     instance: Any?,
     entryPoint: KFunction<R>,
-    application: Application
+    application: Application,
+    moduleInjector: ModuleParametersInjector
 ): R {
-    val args = entryPoint.parameters.filterNot { it.isOptional }.associateBy(
-        { it },
-        { parameter ->
-            when {
-                parameter.kind == KParameter.Kind.INSTANCE -> instance
-                isApplicationEnvironment(parameter) -> application.environment
-                isApplication(parameter) -> application
-                parameter.type.toString().contains("Application") -> {
-                    // It is possible that type is okay, but classloader is not
-                    val classLoader = (parameter.type.javaType as? Class<*>)?.classLoader
-                    throw IllegalArgumentException(
-                        "Parameter type ${parameter.type}:{$classLoader} is not supported." +
-                            "Application is loaded as " +
-                            "$ApplicationClassInstance:{${ApplicationClassInstance.classLoader}}"
+    val args = entryPoint.parameters.mapNotNull { parameter ->
+        parameter to when {
+            parameter.kind == KParameter.Kind.INSTANCE -> instance
+            isApplicationEnvironment(parameter) -> application.environment
+            isApplication(parameter) -> application
+
+            else -> {
+                val injectedValue = runCatching { moduleInjector.resolveParameter(application, parameter) }
+                when {
+                    injectedValue.isSuccess -> injectedValue.getOrThrow()
+                    parameter.isOptional -> return@mapNotNull null // skip
+                    parameter.type.isMarkedNullable -> null // value = null
+                    // This check should go last
+                    parameter.type.toString().contains("Application") -> {
+                        // It is possible that type is okay, but classloader is not
+                        val classLoader = (parameter.type.javaType as? Class<*>)?.classLoader
+                        throw IllegalArgumentException(
+                            "Parameter type ${parameter.type}:{$classLoader} is not supported. " +
+                                "Application is loaded as " +
+                                "$ApplicationClassInstance:{${ApplicationClassInstance.classLoader}}"
+                        )
+                    }
+                    else -> throw IllegalArgumentException(
+                        "Failed to inject parameter `${parameter.name ?: "<receiver>"}: ${parameter.type}` " +
+                            "in module function `$entryPoint`",
+                        injectedValue.exceptionOrNull()
                     )
                 }
-
-                else -> throw IllegalArgumentException(
-                    "Parameter type '${parameter.type}' of parameter " +
-                        "'${parameter.name ?: "<receiver>"}' is not supported"
-                )
             }
         }
-    )
+    }.toMap()
 
     try {
-        return entryPoint.callBy(args)
+        return entryPoint.callSuspendBy(args)
     } catch (cause: InvocationTargetException) {
         throw cause.cause ?: cause
     }

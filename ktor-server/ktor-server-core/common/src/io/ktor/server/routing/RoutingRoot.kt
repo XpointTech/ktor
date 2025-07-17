@@ -23,6 +23,9 @@ internal val LOGGER = KtorSimpleLogger("io.ktor.server.routing.Routing")
  * A root routing node of an [Application].
  * You can learn more about routing in Ktor from [Routing](https://ktor.io/docs/routing-in-ktor.html).
  *
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.server.routing.RoutingRoot)
+ *
  * @param application is an instance of [Application] for this routing node.
  */
 @KtorDsl
@@ -53,6 +56,8 @@ public class RoutingRoot(
      * Registers a function used to trace route resolution.
      * Might be useful if you need to understand why a route isn't executed.
      * To learn more, see [Tracing routes](https://ktor.io/docs/tracing-routes.html).
+     *
+     * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.server.routing.RoutingRoot.trace)
      */
     public override fun trace(block: (RoutingResolveTrace) -> Unit) {
         tracers.add(block)
@@ -98,6 +103,9 @@ public class RoutingRoot(
         application.monitor.raise(RoutingCallStarted, routingCall)
         try {
             routingCallPipeline.execute(routingApplicationCall)
+        } catch (cause: Throwable) {
+            routingCall.attributes.put(routingCallKey, routingCall)
+            throw cause
         } finally {
             application.monitor.raise(RoutingCallFinished, routingCall)
         }
@@ -122,17 +130,23 @@ public class RoutingRoot(
 
     /**
      * An installation object of the [RoutingRoot] plugin.
+     *
+     * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.server.routing.RoutingRoot.Plugin)
      */
     @Suppress("PublicApiImplicitType")
     public companion object Plugin : BaseApplicationPlugin<Application, Routing, RoutingRoot> {
 
         /**
          * A definition for an event that is fired when routing-based call processing starts.
+         *
+         * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.server.routing.RoutingRoot.Plugin.RoutingCallStarted)
          */
         public val RoutingCallStarted: EventDefinition<RoutingCall> = EventDefinition()
 
         /**
          * A definition for an event that is fired when routing-based call processing is finished.
+         *
+         * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.server.routing.RoutingRoot.Plugin.RoutingCallFinished)
          */
         public val RoutingCallFinished: EventDefinition<RoutingCall> = EventDefinition()
 
@@ -148,6 +162,8 @@ public class RoutingRoot(
 
 /**
  * Gets an [Application] for this [RoutingNode] by scanning the hierarchy to the root.
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.server.routing.application)
  */
 public val Route.application: Application
     get() = when (this) {
@@ -160,7 +176,11 @@ public val Route.application: Application
 /**
  * Installs a [RoutingRoot] plugin for the this [Application] and runs a [configuration] script on it.
  * You can learn more about routing in Ktor from [Routing](https://ktor.io/docs/routing-in-ktor.html).
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.server.routing.routing)
  */
 @KtorDsl
 public fun Application.routing(configuration: Routing.() -> Unit): RoutingRoot =
     pluginOrNull(RoutingRoot)?.apply(configuration) ?: install(RoutingRoot, configuration)
+
+internal val routingCallKey = AttributeKey<RoutingCall>("RoutingHandler")

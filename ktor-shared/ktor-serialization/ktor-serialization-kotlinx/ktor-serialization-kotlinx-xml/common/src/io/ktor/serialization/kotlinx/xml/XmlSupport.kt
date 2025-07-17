@@ -20,6 +20,8 @@ import nl.adaptivity.xmlutil.serialization.*
  * - Polymorphic serialization is disabled.
  *
  * See [XML] for more details.
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.serialization.kotlinx.xml.DefaultXml)
  */
 public val DefaultXml: XML = XML {
     repairNamespaces = true
@@ -32,7 +34,10 @@ public val DefaultXml: XML = XML {
  * Registers the `application/xml` (or another specified [contentType]) content type
  * to the [ContentNegotiation] plugin using kotlinx.serialization.
  *
- * You can learn more from [Content negotiation and serialization](https://ktor.io/docs/serialization.html).
+ * You can learn more from the corresponding [client](https://ktor.io/docs/client-serialization.html#register_xml) and [server](https://ktor.io/docs/server-serialization.html#register_xml) documentation.
+ *
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.serialization.kotlinx.xml.xml)
  *
  * @param format instance. [DefaultXml] is used by default
  * @param contentType to register with, `application/xml` by default

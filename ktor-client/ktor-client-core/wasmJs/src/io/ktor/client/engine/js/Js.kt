@@ -5,6 +5,7 @@
 package io.ktor.client.engine.js
 
 import io.ktor.client.engine.*
+import io.ktor.client.fetch.*
 import io.ktor.client.utils.*
 import io.ktor.utils.io.*
 
@@ -21,14 +22,32 @@ import io.ktor.utils.io.*
  * ```
  *
  * You can learn more about client engines from [Engines](https://ktor.io/docs/http-client-engines.html).
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.engine.js.Js)
  */
 public actual data object Js : HttpClientEngineFactory<JsClientEngineConfig> {
     override fun create(block: JsClientEngineConfig.() -> Unit): HttpClientEngine =
         JsClientEngine(JsClientEngineConfig().apply(block))
 }
 
-/** Configuration for the [Js] client. */
+/**
+ * Configuration for the [Js] client.
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.engine.js.JsClientEngineConfig)
+ */
 public actual open class JsClientEngineConfig : HttpClientEngineConfig() {
+    internal var requestInit: RequestInit.() -> Unit = {}
+
+    /**
+     * Provides access to the underlying fetch options of the engine.
+     * It allows setting credentials, cache, mode, redirect, referrer, integrity, keepalive, signal, window.
+     *
+     * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.engine.js.JsClientEngineConfig.configureRequest)
+     */
+    public fun configureRequest(block: RequestInit.() -> Unit) {
+        requestInit = block
+    }
+
     /**
      * An `Object` which can contain additional configuration options that should get passed to node-fetch.
      *
@@ -44,7 +63,10 @@ public actual open class JsClientEngineConfig : HttpClientEngineConfig() {
      *     }
      * }
      * ```
+     *
+     * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.engine.js.JsClientEngineConfig.nodeOptions)
      */
+    @Deprecated("Use configureRequest instead", level = DeprecationLevel.WARNING)
     public var nodeOptions: JsAny = makeJsObject()
 }
 

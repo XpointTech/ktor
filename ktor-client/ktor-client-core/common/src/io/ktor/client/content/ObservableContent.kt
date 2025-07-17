@@ -20,10 +20,15 @@ import kotlin.coroutines.CoroutineContext
  * Callback that can be registered to listen for upload/download progress.
  *
  * This class is used for callbacks in [HttpRequestBuilder.onDownload] and [HttpRequestBuilder.onUpload].
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.content.ProgressListener)
  */
 public fun interface ProgressListener {
     /**
      * Invokes every time some data is flushed through the [ByteReadChannel].
+     *
+     *
+     * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.content.ProgressListener.onProgress)
      *
      * @param bytesSentTotal number of transmitted bytes.
      * @param contentLength body size. Can be null if the size is unknown.
@@ -36,8 +41,6 @@ internal class ObservableContent(
     private val callContext: CoroutineContext,
     private val listener: ProgressListener
 ) : OutgoingContent.ReadChannelContent() {
-
-    private val content: ByteReadChannel = getContent(delegate)
 
     @OptIn(DelicateCoroutinesApi::class)
     private fun getContent(delegate: OutgoingContent): ByteReadChannel = when (delegate) {
@@ -63,5 +66,5 @@ internal class ObservableContent(
     override fun <T : Any> getProperty(key: AttributeKey<T>): T? = delegate.getProperty(key)
     override fun <T : Any> setProperty(key: AttributeKey<T>, value: T?): Unit = delegate.setProperty(key, value)
 
-    override fun readFrom(): ByteReadChannel = content.observable(callContext, contentLength, listener)
+    override fun readFrom(): ByteReadChannel = getContent(delegate).observable(callContext, contentLength, listener)
 }

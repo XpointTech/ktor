@@ -5,22 +5,21 @@
 description = ""
 
 plugins {
+    id("ktorbuild.project.internal")
     id("kotlinx-serialization")
 }
 
-kotlin.sourceSets {
-    commonTest {
-        dependencies {
-            api(project(":ktor-server"))
-            api(project(":ktor-server:ktor-server-plugins:ktor-server-rate-limit"))
-            api(project(":ktor-server:ktor-server-test-host"))
+kotlin {
+    sourceSets {
+        commonTest.dependencies {
+            api(projects.ktorServer)
+            api(projects.ktorServerRateLimit)
+            api(projects.ktorServerTestHost)
         }
-    }
-    jvmTest {
-        dependencies {
+        jvmTest.dependencies {
             implementation(libs.jansi)
-            implementation(project(":ktor-client:ktor-client-plugins:ktor-client-encoding"))
-            api(project(":ktor-server:ktor-server-plugins:ktor-server-sse"))
+            implementation(projects.ktorClientEncoding)
+            api(projects.ktorServerSse)
         }
     }
 }

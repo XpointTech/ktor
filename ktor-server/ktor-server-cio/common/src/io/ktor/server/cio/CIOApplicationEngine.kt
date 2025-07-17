@@ -15,10 +15,12 @@ import io.ktor.server.response.*
 import io.ktor.util.pipeline.*
 import io.ktor.utils.io.*
 import kotlinx.coroutines.*
-import kotlin.concurrent.*
+import kotlin.concurrent.Volatile
 
 /**
  * Engine that based on CIO backend
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.server.cio.CIOApplicationEngine)
  */
 public class CIOApplicationEngine(
     environment: ApplicationEnvironment,
@@ -30,16 +32,22 @@ public class CIOApplicationEngine(
 
     /**
      * CIO-based server configuration
+     *
+     * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.server.cio.CIOApplicationEngine.Configuration)
      */
     public class Configuration : BaseApplicationEngine.Configuration() {
         /**
          * Number of seconds that the server will keep HTTP IDLE connections open.
          * A connection is IDLE if there are no active requests running.
+         *
+         * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.server.cio.CIOApplicationEngine.Configuration.connectionIdleTimeoutSeconds)
          */
         public var connectionIdleTimeoutSeconds: Int = 45
 
         /**
          * Allow the server to bind to an address that is already in use
+         *
+         * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.server.cio.CIOApplicationEngine.Configuration.reuseAddress)
          */
         public var reuseAddress: Boolean = false
     }
@@ -100,20 +108,34 @@ public class CIOApplicationEngine(
         stopSuspend(gracePeriodMillis, timeoutMillis)
     }
 
-    private fun CoroutineScope.startConnector(host: String, port: Int): HttpServer {
-        val settings = HttpServerSettings(
-            host = host,
-            port = port,
-            connectionIdleTimeoutSeconds = configuration.connectionIdleTimeoutSeconds.toLong(),
-            reuseAddress = configuration.reuseAddress
-        )
+    private fun CoroutineScope.startConnector(connectorSpec: EngineConnectorConfig): HttpServer {
+        return when (connectorSpec) {
+            is UnixSocketConnectorConfig -> {
+                val settings = UnixSocketServerSettings(
+                    socketPath = connectorSpec.socketPath,
+                    connectionIdleTimeoutSeconds = configuration.connectionIdleTimeoutSeconds.toLong(),
+                )
 
-        return httpServer(settings) { request ->
-            handleRequest(request)
+                unixSocketServer(settings) { request ->
+                    handleRequest(request)
+                }
+            }
+            else -> {
+                val settings = HttpServerSettings(
+                    host = connectorSpec.host,
+                    port = connectorSpec.port,
+                    connectionIdleTimeoutSeconds = configuration.connectionIdleTimeoutSeconds.toLong(),
+                    reuseAddress = configuration.reuseAddress
+                )
+
+                httpServer(settings) { request ->
+                    handleRequest(request)
+                }
+            }
         }
     }
 
-    private suspend fun addHandlerForExpectedHeader(output: ByteWriteChannel, call: CIOApplicationCall) {
+    private fun addHandlerForExpectedHeader(output: ByteWriteChannel, call: CIOApplicationCall) {
         val continueResponse = "HTTP/1.1 100 Continue\r\n"
         val expectHeaderValue = "100-continue"
 
@@ -195,13 +217,15 @@ public class CIOApplicationEngine(
                 }
 
                 val connectorsAndServers = configuration.connectors.map { connectorSpec ->
-                    connectorSpec to startConnector(connectorSpec.host, connectorSpec.port)
+                    connectorSpec to startConnector(connectorSpec)
                 }
                 connectors.addAll(connectorsAndServers.map { it.second })
 
                 val resolvedConnectors = connectorsAndServers
                     .map { (connector, server) -> connector to server.serverSocket.await() }
-                    .map { (connector, socket) -> connector.withPort(socket.localAddress.port) }
+                    .map { (connector, socket) ->
+                        socket.localAddress.port?.let { connector.withPort(it) } ?: connector
+                    }
                 cioConnectors.complete(resolvedConnectors)
             } catch (cause: Throwable) {
                 connectors.forEach { it.rootServerJob.cancel() }
@@ -216,12 +240,12 @@ public class CIOApplicationEngine(
             // stopping
             connectors.forEach {
                 it.acceptJob.cancel()
-                it.rootServerJob.cancel()
             }
 
             withContext(userDispatcher) {
                 monitor.raise(ApplicationStopPreparing, environment)
             }
+            connectors.map { it.rootServerJob }.joinAll()
         }
     }
 }

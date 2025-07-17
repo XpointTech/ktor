@@ -9,6 +9,10 @@
 // - Show declarations: true
 
 // Library unique name: <io.ktor:ktor-io>
+open annotation class io.ktor.utils.io/ExperimentalKtorApi : kotlin/Annotation { // io.ktor.utils.io/ExperimentalKtorApi|null[0]
+    constructor <init>() // io.ktor.utils.io/ExperimentalKtorApi.<init>|<init>(){}[0]
+}
+
 open annotation class io.ktor.utils.io/InternalAPI : kotlin/Annotation { // io.ktor.utils.io/InternalAPI|null[0]
     constructor <init>() // io.ktor.utils.io/InternalAPI.<init>|<init>(){}[0]
 }
@@ -270,6 +274,8 @@ final class io.ktor.utils.io/ReaderJob : io.ktor.utils.io/ChannelJob { // io.kto
         final fun <get-channel>(): io.ktor.utils.io/ByteWriteChannel // io.ktor.utils.io/ReaderJob.channel.<get-channel>|<get-channel>(){}[0]
     final val job // io.ktor.utils.io/ReaderJob.job|{}job[0]
         final fun <get-job>(): kotlinx.coroutines/Job // io.ktor.utils.io/ReaderJob.job.<get-job>|<get-job>(){}[0]
+
+    final suspend fun flushAndClose() // io.ktor.utils.io/ReaderJob.flushAndClose|flushAndClose(){}[0]
 }
 
 final class io.ktor.utils.io/ReaderScope : kotlinx.coroutines/CoroutineScope { // io.ktor.utils.io/ReaderScope|null[0]
@@ -295,6 +301,25 @@ final class io.ktor.utils.io/WriterScope : kotlinx.coroutines/CoroutineScope { /
         final fun <get-channel>(): io.ktor.utils.io/ByteWriteChannel // io.ktor.utils.io/WriterScope.channel.<get-channel>|<get-channel>(){}[0]
     final val coroutineContext // io.ktor.utils.io/WriterScope.coroutineContext|{}coroutineContext[0]
         final fun <get-coroutineContext>(): kotlin.coroutines/CoroutineContext // io.ktor.utils.io/WriterScope.coroutineContext.<get-coroutineContext>|<get-coroutineContext>(){}[0]
+}
+
+final value class io.ktor.utils.io/LineEndingMode { // io.ktor.utils.io/LineEndingMode|null[0]
+    final fun contains(io.ktor.utils.io/LineEndingMode): kotlin/Boolean // io.ktor.utils.io/LineEndingMode.contains|contains(io.ktor.utils.io.LineEndingMode){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // io.ktor.utils.io/LineEndingMode.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // io.ktor.utils.io/LineEndingMode.hashCode|hashCode(){}[0]
+    final fun plus(io.ktor.utils.io/LineEndingMode): io.ktor.utils.io/LineEndingMode // io.ktor.utils.io/LineEndingMode.plus|plus(io.ktor.utils.io.LineEndingMode){}[0]
+    final fun toString(): kotlin/String // io.ktor.utils.io/LineEndingMode.toString|toString(){}[0]
+
+    final object Companion { // io.ktor.utils.io/LineEndingMode.Companion|null[0]
+        final val Any // io.ktor.utils.io/LineEndingMode.Companion.Any|{}Any[0]
+            final fun <get-Any>(): io.ktor.utils.io/LineEndingMode // io.ktor.utils.io/LineEndingMode.Companion.Any.<get-Any>|<get-Any>(){}[0]
+        final val CR // io.ktor.utils.io/LineEndingMode.Companion.CR|{}CR[0]
+            final fun <get-CR>(): io.ktor.utils.io/LineEndingMode // io.ktor.utils.io/LineEndingMode.Companion.CR.<get-CR>|<get-CR>(){}[0]
+        final val CRLF // io.ktor.utils.io/LineEndingMode.Companion.CRLF|{}CRLF[0]
+            final fun <get-CRLF>(): io.ktor.utils.io/LineEndingMode // io.ktor.utils.io/LineEndingMode.Companion.CRLF.<get-CRLF>|<get-CRLF>(){}[0]
+        final val LF // io.ktor.utils.io/LineEndingMode.Companion.LF|{}LF[0]
+            final fun <get-LF>(): io.ktor.utils.io/LineEndingMode // io.ktor.utils.io/LineEndingMode.Companion.LF.<get-LF>|<get-LF>(){}[0]
+    }
 }
 
 open class io.ktor.utils.io.charsets/MalformedInputException : kotlinx.io/IOException { // io.ktor.utils.io.charsets/MalformedInputException|null[0]
@@ -381,6 +406,7 @@ final fun (io.ktor.utils.io/ByteWriteChannel).io.ktor.utils.io/rethrowCloseCause
 final fun (io.ktor.utils.io/ChannelJob).io.ktor.utils.io/cancel() // io.ktor.utils.io/cancel|cancel@io.ktor.utils.io.ChannelJob(){}[0]
 final fun (io.ktor.utils.io/ChannelJob).io.ktor.utils.io/getCancellationException(): kotlin.coroutines.cancellation/CancellationException // io.ktor.utils.io/getCancellationException|getCancellationException@io.ktor.utils.io.ChannelJob(){}[0]
 final fun (io.ktor.utils.io/ChannelJob).io.ktor.utils.io/invokeOnCompletion(kotlin/Function0<kotlin/Unit>) // io.ktor.utils.io/invokeOnCompletion|invokeOnCompletion@io.ktor.utils.io.ChannelJob(kotlin.Function0<kotlin.Unit>){}[0]
+final fun (io.ktor.utils.io/ChannelJob).io.ktor.utils.io/invokeOnCompletion(kotlin/Function1<kotlin/Throwable?, kotlin/Unit>): kotlinx.coroutines/DisposableHandle // io.ktor.utils.io/invokeOnCompletion|invokeOnCompletion@io.ktor.utils.io.ChannelJob(kotlin.Function1<kotlin.Throwable?,kotlin.Unit>){}[0]
 final fun (kotlin/ByteArray).io.ktor.utils.io.core/storeIntAt(kotlin/Int, kotlin/Int) // io.ktor.utils.io.core/storeIntAt|storeIntAt@kotlin.ByteArray(kotlin.Int;kotlin.Int){}[0]
 final fun (kotlin/Double).io.ktor.utils.io.bits/reverseByteOrder(): kotlin/Double // io.ktor.utils.io.bits/reverseByteOrder|reverseByteOrder@kotlin.Double(){}[0]
 final fun (kotlin/Float).io.ktor.utils.io.bits/reverseByteOrder(): kotlin/Float // io.ktor.utils.io.bits/reverseByteOrder|reverseByteOrder@kotlin.Float(){}[0]
@@ -461,6 +487,7 @@ final suspend fun (io.ktor.utils.io/ByteReadChannel).io.ktor.utils.io/readRemain
 final suspend fun (io.ktor.utils.io/ByteReadChannel).io.ktor.utils.io/readShort(): kotlin/Short // io.ktor.utils.io/readShort|readShort@io.ktor.utils.io.ByteReadChannel(){}[0]
 final suspend fun (io.ktor.utils.io/ByteReadChannel).io.ktor.utils.io/readUTF8Line(kotlin/Int = ...): kotlin/String? // io.ktor.utils.io/readUTF8Line|readUTF8Line@io.ktor.utils.io.ByteReadChannel(kotlin.Int){}[0]
 final suspend fun (io.ktor.utils.io/ByteReadChannel).io.ktor.utils.io/readUTF8LineTo(kotlin.text/Appendable, kotlin/Int = ...): kotlin/Boolean // io.ktor.utils.io/readUTF8LineTo|readUTF8LineTo@io.ktor.utils.io.ByteReadChannel(kotlin.text.Appendable;kotlin.Int){}[0]
+final suspend fun (io.ktor.utils.io/ByteReadChannel).io.ktor.utils.io/readUTF8LineTo(kotlin.text/Appendable, kotlin/Int = ..., io.ktor.utils.io/LineEndingMode = ...): kotlin/Boolean // io.ktor.utils.io/readUTF8LineTo|readUTF8LineTo@io.ktor.utils.io.ByteReadChannel(kotlin.text.Appendable;kotlin.Int;io.ktor.utils.io.LineEndingMode){}[0]
 final suspend fun (io.ktor.utils.io/ByteReadChannel).io.ktor.utils.io/readUntil(kotlinx.io.bytestring/ByteString, io.ktor.utils.io/ByteWriteChannel, kotlin/Long = ..., kotlin/Boolean = ...): kotlin/Long // io.ktor.utils.io/readUntil|readUntil@io.ktor.utils.io.ByteReadChannel(kotlinx.io.bytestring.ByteString;io.ktor.utils.io.ByteWriteChannel;kotlin.Long;kotlin.Boolean){}[0]
 final suspend fun (io.ktor.utils.io/ByteReadChannel).io.ktor.utils.io/skipIfFound(kotlinx.io.bytestring/ByteString): kotlin/Boolean // io.ktor.utils.io/skipIfFound|skipIfFound@io.ktor.utils.io.ByteReadChannel(kotlinx.io.bytestring.ByteString){}[0]
 final suspend fun (io.ktor.utils.io/ByteReadChannel).io.ktor.utils.io/toByteArray(): kotlin/ByteArray // io.ktor.utils.io/toByteArray|toByteArray@io.ktor.utils.io.ByteReadChannel(){}[0]

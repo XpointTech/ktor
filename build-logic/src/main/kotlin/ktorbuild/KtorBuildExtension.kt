@@ -4,25 +4,18 @@
 
 package ktorbuild
 
-import ktorbuild.internal.gradle.finalizedOnRead
 import ktorbuild.targets.KtorTargets
 import org.gradle.api.JavaVersion
 import org.gradle.api.model.ObjectFactory
-import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
 import org.gradle.api.provider.ProviderFactory
+import org.gradle.internal.os.OperatingSystem
 import org.gradle.jvm.toolchain.JavaLanguageVersion
 import org.gradle.kotlin.dsl.newInstance
-import org.gradle.kotlin.dsl.property
-import org.gradle.platform.BuildPlatform
-import org.gradle.platform.OperatingSystem
 import javax.inject.Inject
 
-@Suppress("UnstableApiUsage")
-abstract class KtorBuildExtension(
-    objects: ObjectFactory,
+abstract class KtorBuildExtension private constructor(
     providers: ProviderFactory,
-    buildPlatform: BuildPlatform,
     val targets: KtorTargets,
 ) {
 
@@ -30,21 +23,16 @@ abstract class KtorBuildExtension(
     constructor(
         objects: ObjectFactory,
         providers: ProviderFactory,
-        buildPlatform: BuildPlatform,
-    ) : this(objects, providers, buildPlatform, targets = objects.newInstance())
+    ) : this(providers, targets = objects.newInstance())
 
-    /**
-     * The JDK version to be used to build the project.
-     * By default, the minimal supported JDK version is used.
-     */
-    val jvmToolchain: Property<JavaLanguageVersion> =
-        objects.property<JavaLanguageVersion>()
-            .convention(DEFAULT_JDK)
-            .finalizedOnRead()
+    private val buildingOnTeamCity: Provider<Boolean> =
+        providers.environmentVariable("TEAMCITY_VERSION").map(String::isNotBlank)
 
-    fun jvmToolchain(version: Int) {
-        jvmToolchain.set(JavaLanguageVersion.of(version))
-    }
+    val isCI: Provider<Boolean> =
+        providers.environmentVariable("CI")
+            .map(String::isNotBlank)
+            .orElse(buildingOnTeamCity)
+            .orElse(false)
 
     /**
      * The JDK version to be used for testing.
@@ -61,12 +49,12 @@ abstract class KtorBuildExtension(
             .map(JavaLanguageVersion::of)
 
     /** Host operating system. */
-    val os: Provider<OperatingSystem> = providers.provider { buildPlatform.operatingSystem }
+    val os: Provider<OperatingSystem> = providers.provider { OperatingSystem.current() }
 
     companion object {
         const val NAME = "ktorBuild"
 
         /** The default (minimal) JDK version used for building the project. */
-        private val DEFAULT_JDK = JavaLanguageVersion.of(8)
+        const val DEFAULT_JDK = 8
     }
 }

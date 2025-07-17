@@ -18,7 +18,7 @@ public fun Source.inputStream(): InputStream = asInputStream()
 
 @OptIn(InternalIoApi::class)
 public fun OutputStream.writePacket(packet: Source) {
-    packet.buffer.copyTo(this)
+    packet.transferTo(this.asSink())
 }
 
 public fun OutputStream.writePacket(block: Sink.() -> Unit) {
@@ -50,5 +50,7 @@ public fun InputStream.readPacketAtLeast(min: Int = 1): Source {
  *
  * All operations on the [ByteWriteChannel] are buffered: the underlying [OutputStream] will be receiving bytes
  * when the [ByteWriteChannel.flush] happens.
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.utils.io.streams.asByteWriteChannel)
  */
 public fun OutputStream.asByteWriteChannel(): ByteWriteChannel = asSink().asByteWriteChannel()

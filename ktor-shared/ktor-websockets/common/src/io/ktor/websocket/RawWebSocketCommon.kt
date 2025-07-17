@@ -18,6 +18,9 @@ import kotlin.random.*
 /**
  * Creates a RAW web socket session from connection.
  *
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.websocket.RawWebSocket)
+ *
  * @param input is a [ByteReadChannel] of connection
  * @param output is a [ByteWriteChannel] of connection
  * @param maxFrameSize is an initial [maxFrameSize] value for [WebSocketSession]
@@ -164,6 +167,8 @@ private fun Source.mask(maskKey: Int): Source = withMemory(4) { maskMemory ->
 /**
  * Serializes WebSocket [Frame] and writes the bits into the [ByteWriteChannel].
  * If [masking] is true, then data will be masked with random mask
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.websocket.writeFrame)
  */
 @InternalAPI // used in tests
 public suspend fun ByteWriteChannel.writeFrame(frame: Frame, masking: Boolean) {
@@ -209,6 +214,9 @@ public suspend fun ByteWriteChannel.writeFrame(frame: Frame, masking: Boolean) {
 /**
  * Reads bits from [ByteReadChannel] and converts into a WebSocket [Frame].
  *
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.websocket.readFrame)
+ *
  * @param maxFrameSize maximum frame size that could be read
  * @param lastOpcode last read opcode
  */
@@ -223,7 +231,7 @@ public suspend fun ByteReadChannel.readFrame(maxFrameSize: Long, lastOpcode: Int
         throw ProtocolViolationException("Can't continue finished frames")
     }
     val opcode = if (rawOpcode == 0) lastOpcode else rawOpcode
-    val frameType = FrameType[opcode] ?: throw IllegalStateException("Unsupported opcode: $opcode")
+    val frameType = FrameType[opcode] ?: throw ProtocolViolationException("Unsupported opcode: $opcode")
     if (rawOpcode != 0 && lastOpcode != 0 && !frameType.controlFrame) {
         // trying to intermix data frames
         throw ProtocolViolationException("Can't start new data frame before finishing previous one")

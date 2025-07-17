@@ -11,17 +11,19 @@ import io.ktor.server.engine.internal.*
 import io.ktor.server.logging.*
 import io.ktor.server.plugins.*
 import io.ktor.server.response.*
+import io.ktor.server.routing.routingCallKey
 import io.ktor.util.cio.*
 import io.ktor.util.logging.*
 import io.ktor.util.pipeline.*
 import io.ktor.utils.io.*
-import io.ktor.utils.io.errors.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.io.IOException
 
 /**
  * Default engine pipeline for all engines. Use it only if you are writing your own application engine implementation.
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.server.engine.defaultEnginePipeline)
  */
 public fun defaultEnginePipeline(config: ApplicationConfig, developmentMode: Boolean): EnginePipeline {
     val pipeline = EnginePipeline(developmentMode)
@@ -36,7 +38,12 @@ public fun defaultEnginePipeline(config: ApplicationConfig, developmentMode: Boo
                 call.application.environment.logFailure(call, error)
             }
         } catch (error: Throwable) {
-            handleFailure(call, error)
+            val routeCall = call.attributes.getOrNull(routingCallKey)
+            if (routeCall != null) {
+                handleFailure(routeCall, error)
+            } else {
+                handleFailure(call, error)
+            }
         } finally {
             try {
                 call.request.receiveChannel().discard()
@@ -50,6 +57,8 @@ public fun defaultEnginePipeline(config: ApplicationConfig, developmentMode: Boo
 
 /**
  * Logs the [error] and responds with an appropriate error status code.
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.server.engine.handleFailure)
  */
 public suspend fun handleFailure(call: ApplicationCall, error: Throwable) {
     logError(call, error)
@@ -58,6 +67,8 @@ public suspend fun handleFailure(call: ApplicationCall, error: Throwable) {
 
 /**
  * Logs the [error] with MDC setup.
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.server.engine.logError)
  */
 public suspend fun logError(call: ApplicationCall, error: Throwable) {
     call.application.mdcProvider.withMDCBlock(call) {
@@ -67,16 +78,16 @@ public suspend fun logError(call: ApplicationCall, error: Throwable) {
 
 /**
  * Map [cause] to the corresponding status code or `null` if no default exception mapping for this [cause] type
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.server.engine.defaultExceptionStatusCode)
  */
-public fun defaultExceptionStatusCode(cause: Throwable): HttpStatusCode? {
-    return when (cause) {
-        is BadRequestException -> HttpStatusCode.BadRequest
-        is NotFoundException -> HttpStatusCode.NotFound
-        is UnsupportedMediaTypeException -> HttpStatusCode.UnsupportedMediaType
-        is PayloadTooLargeException -> HttpStatusCode.PayloadTooLarge
-        is TimeoutException, is TimeoutCancellationException -> HttpStatusCode.GatewayTimeout
-        else -> null
-    }
+public fun defaultExceptionStatusCode(cause: Throwable): HttpStatusCode? = when (cause) {
+    is BadRequestException -> HttpStatusCode.BadRequest
+    is NotFoundException -> HttpStatusCode.NotFound
+    is UnsupportedMediaTypeException -> HttpStatusCode.UnsupportedMediaType
+    is PayloadTooLargeException -> HttpStatusCode.PayloadTooLarge
+    is TimeoutException, is TimeoutCancellationException -> HttpStatusCode.GatewayTimeout
+    else -> null
 }
 
 private suspend fun tryRespondError(call: ApplicationCall, statusCode: HttpStatusCode) {

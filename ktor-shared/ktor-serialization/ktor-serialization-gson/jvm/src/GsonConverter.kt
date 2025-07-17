@@ -21,6 +21,9 @@ import kotlin.reflect.*
 /**
  * A content converter that uses [Gson]
  *
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.serialization.gson.GsonConverter)
+ *
  * @param gson a configured instance of [Gson]
  */
 public class GsonConverter(private val gson: Gson = Gson()) : ContentConverter {
@@ -101,7 +104,9 @@ internal class ExcludedTypeGsonException(
 /**
  * Registers the `application/json` content type to the [ContentNegotiation] plugin using GSON.
  *
- * You can learn more from [Content negotiation and serialization](https://ktor.io/docs/serialization.html).
+ * You can learn more from the corresponding [client](https://ktor.io/docs/client-serialization.html#-3bcvpz_157) and [server](https://ktor.io/docs/server-serialization.html#-230zkf_174) documentation.
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.serialization.gson.gson)
  */
 public fun Configuration.gson(
     contentType: ContentType = ContentType.Application.Json,

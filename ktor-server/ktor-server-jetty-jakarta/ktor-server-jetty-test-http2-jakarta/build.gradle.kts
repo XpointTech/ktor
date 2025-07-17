@@ -4,19 +4,21 @@
 
 import org.jetbrains.kotlin.gradle.targets.jvm.tasks.KotlinJvmTest
 
-ktorBuild {
-    // The minimal JVM version required for Jetty 10+
-    jvmToolchain(11)
+plugins {
+    id("ktorbuild.project.internal")
 }
 
-kotlin.sourceSets {
-    jvmTest {
-        dependencies {
-            api(project(":ktor-server:ktor-server-test-base"))
-            api(project(":ktor-server:ktor-server-test-suites"))
+kotlin {
+    // The minimal JVM version required for Jetty 10+
+    jvmToolchain(11)
+
+    sourceSets {
+        jvmTest.dependencies {
+            api(projects.ktorServerTestBase)
+            api(projects.ktorServerTestSuites)
             api(libs.jetty.servlet.jakarta)
-            api(project(":ktor-server:ktor-server-core"))
-            api(project(":ktor-server:ktor-server-jetty-jakarta"))
+            api(projects.ktorServerCore)
+            api(projects.ktorServerJettyJakarta)
         }
     }
 }

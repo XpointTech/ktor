@@ -4,20 +4,22 @@
 
 description = ""
 
-kotlin.sourceSets {
-    jvmMain {
-        dependencies {
-            api(project(":ktor-server:ktor-server-core"))
-            api(project(":ktor-server:ktor-server-servlet"))
+plugins {
+    id("ktorbuild.project.library")
+}
+
+kotlin {
+    sourceSets {
+        jvmMain.dependencies {
+            api(projects.ktorServerCore)
+            api(projects.ktorServerServlet)
             api(libs.tomcat.catalina)
             api(libs.tomcat.embed.core)
         }
-    }
-    jvmTest {
-        dependencies {
-            api(project(":ktor-server:ktor-server-test-base"))
-            api(project(":ktor-server:ktor-server-test-suites"))
-            api(project(":ktor-server:ktor-server-core"))
+        jvmTest.dependencies {
+            api(projects.ktorServerTestBase)
+            api(projects.ktorServerTestSuites)
+            api(projects.ktorServerCore)
         }
     }
 }

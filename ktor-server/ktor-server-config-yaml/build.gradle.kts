@@ -1,12 +1,19 @@
 /*
- * Copyright 2014-2020 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
+ * Copyright 2014-2025 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
  */
 
-kotlin.sourceSets {
-    commonMain {
-        dependencies {
-            api(project(":ktor-server:ktor-server-core"))
+plugins {
+    id("ktorbuild.project.library")
+    id("kotlinx-serialization")
+}
+
+kotlin {
+    sourceSets {
+        commonMain.dependencies {
+            api(projects.ktorServerCore)
+            // KTOR-8386 Remove in next major release
             api(libs.yamlkt.serialization)
+            implementation(libs.kaml.serialization)
         }
     }
 }

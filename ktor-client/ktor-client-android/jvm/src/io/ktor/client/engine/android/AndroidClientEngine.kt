@@ -14,17 +14,20 @@ import io.ktor.http.content.*
 import io.ktor.util.date.*
 import io.ktor.utils.io.*
 import io.ktor.utils.io.jvm.javaio.*
-import kotlinx.coroutines.*
-import java.io.*
-import java.net.*
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.GlobalScope
+import java.io.OutputStream
+import java.net.HttpURLConnection
+import java.net.URL
+import java.net.URLConnection
 import java.util.*
-import javax.net.ssl.*
-import kotlin.coroutines.*
-
-private val METHODS_WITHOUT_BODY = listOf(HttpMethod.Get, HttpMethod.Head)
+import javax.net.ssl.HttpsURLConnection
+import kotlin.coroutines.CoroutineContext
 
 /**
  * An Android client engine.
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.engine.android.AndroidClientEngine)
  */
 @OptIn(InternalAPI::class)
 public class AndroidClientEngine(override val config: AndroidEngineConfig) : HttpClientEngineBase("ktor-android") {
@@ -55,13 +58,11 @@ public class AndroidClientEngine(override val config: AndroidEngineConfig) : Htt
             useCaches = false
             instanceFollowRedirects = false
 
-            mergeHeaders(data.headers, outgoingContent) { key: String, value: String ->
-                addRequestProperty(key, value)
-            }
+            data.forEachHeader(::addRequestProperty)
 
             config.requestConfig(this)
 
-            if (data.method in METHODS_WITHOUT_BODY) {
+            if (!data.method.supportsRequestBody) {
                 if (outgoingContent.isEmpty()) {
                     return@apply
                 }
@@ -109,7 +110,6 @@ public class AndroidClientEngine(override val config: AndroidEngineConfig) : Htt
 }
 
 @OptIn(DelicateCoroutinesApi::class)
-@Suppress("BlockingMethodInNonBlockingContext", "DEPRECATION")
 internal suspend fun OutgoingContent.writeTo(
     stream: OutputStream,
     callContext: CoroutineContext

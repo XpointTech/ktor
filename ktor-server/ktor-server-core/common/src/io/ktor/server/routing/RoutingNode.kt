@@ -12,11 +12,13 @@ import io.ktor.util.*
 import io.ktor.util.pipeline.*
 import io.ktor.util.reflect.*
 import io.ktor.utils.io.*
-import kotlinx.coroutines.*
-import kotlin.coroutines.*
+import kotlin.coroutines.CoroutineContext
 
 /**
  * Describes a node in a routing tree.
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.server.routing.RoutingNode)
+ *
  * @see [Application.routing]
  *
  * @param parent is a parent node in the tree, or null for root node.
@@ -34,6 +36,8 @@ public open class RoutingNode(
 
     /**
      * List of child routes for this node.
+     *
+     * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.server.routing.RoutingNode.children)
      */
     public val children: List<RoutingNode> get() = childList
 
@@ -45,6 +49,8 @@ public open class RoutingNode(
 
     /**
      * Creates a child node in this node with a given [selector] or returns an existing one with the same selector.
+     *
+     * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.server.routing.RoutingNode.createChild)
      */
     public override fun createChild(selector: RouteSelector): RoutingNode {
         val existingEntry = childList.firstOrNull { it.selector == selector }
@@ -58,11 +64,15 @@ public open class RoutingNode(
 
     /**
      * Allows using a route instance for building additional routes.
+     *
+     * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.server.routing.RoutingNode.invoke)
      */
     public operator fun invoke(body: RoutingNode.() -> Unit): Unit = body()
 
     /**
      * Installs a handler into this route which is called when the route is selected for a call.
+     *
+     * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.server.routing.RoutingNode.handle)
      */
     public override fun handle(body: RoutingHandler) {
         handlers.add(body)
@@ -138,6 +148,9 @@ public open class RoutingNode(
 /**
  * A client's request that can be handled in [RoutingRoot].
  * To learn how to handle incoming requests, see [Handling requests](https://ktor.io/docs/requests.html).
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.server.routing.RoutingRequest)
+ *
  * @see [RoutingCall]
  * @see [RoutingResponse]
  */
@@ -159,6 +172,9 @@ public class RoutingRequest internal constructor(
 /**
  * A server's response that can be used to respond in [RoutingRoot].
  * To learn how to send responses inside route handlers, see [Sending responses](https://ktor.io/docs/responses.html).
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.server.routing.RoutingResponse)
+ *
  * @see [RoutingCall]
  * @see [RoutingRequest]
  */
@@ -189,6 +205,9 @@ public class RoutingResponse internal constructor(
 
 /**
  * A single act of communication between a client and server that is handled in [RoutingRoot].
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.server.routing.RoutingCall)
+ *
  * @see [io.ktor.server.request.ApplicationRequest]
  * @see [io.ktor.server.response.ApplicationResponse]
  */
@@ -232,6 +251,8 @@ public class RoutingCall internal constructor(
 
 /**
  * The context of a [RoutingHandler] that is used to handle a [RoutingCall].
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.server.routing.RoutingContext)
  */
 public class RoutingContext(
     public val call: RoutingCall
@@ -239,11 +260,15 @@ public class RoutingContext(
 
 /**
  * A function that handles a [RoutingCall].
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.server.routing.RoutingHandler)
  */
 public typealias RoutingHandler = suspend RoutingContext.() -> Unit
 
 /**
  * A builder for a routing tree.
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.server.routing.Route)
  */
 public interface Route {
     public val environment: ApplicationEnvironment
@@ -252,17 +277,24 @@ public interface Route {
 
     /**
      * Installs a handler into this route which is called when the route is selected for a call.
+     *
+     * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.server.routing.Route.handle)
      */
     public fun handle(body: RoutingHandler)
 
     /**
      * Creates a child node in this node with a given [selector] or returns an existing one with the same selector.
+     *
+     * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.server.routing.Route.createChild)
      */
     public fun createChild(selector: RouteSelector): Route
 
     /**
      * Gets a plugin instance for this pipeline, or fails with [MissingApplicationPluginException]
      * if the plugin is not installed.
+     *
+     * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.server.routing.Route.plugin)
+     *
      * @throws MissingApplicationPluginException
      * @param plugin [Plugin] to lookup
      * @return an instance of a plugin
@@ -271,6 +303,9 @@ public interface Route {
 
     /**
      * Installs a [plugin] into this route, if it is not yet installed.
+     *
+     * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.server.routing.Route.install)
+     *
      * @return an instance of a plugin
      */
     public fun <B : Any, F : Any> install(
@@ -281,6 +316,8 @@ public interface Route {
 
 /**
  * A builder for a routing tree root.
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.server.routing.Routing)
  */
 public interface Routing : Route {
 
@@ -288,12 +325,16 @@ public interface Routing : Route {
      * Registers a function used to trace route resolution.
      * Might be useful if you need to understand why a route isn't executed.
      * To learn more, see [Tracing routes](https://ktor.io/docs/tracing-routes.html).
+     *
+     * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.server.routing.Routing.trace)
      */
     public fun trace(block: (RoutingResolveTrace) -> Unit)
 }
 
 /**
  * Return list of endpoints with handlers under this route.
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.server.routing.getAllRoutes)
  */
 public fun RoutingNode.getAllRoutes(): List<RoutingNode> {
     val endpoints = mutableListOf<RoutingNode>()
@@ -306,6 +347,38 @@ private fun RoutingNode.getAllRoutes(endpoints: MutableList<RoutingNode>) {
         endpoints.add(this)
     }
     children.forEach { it.getAllRoutes(endpoints) }
+}
+
+/**
+ * String representation of the path matched by this route.
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.server.routing.path)
+ */
+public val RoutingNode.path: String
+    get() = path()
+
+private fun RoutingNode.path(): String {
+    val parentPath = parent?.path()
+    val selectorElement = selector.toPathElement()
+    return when {
+        parentPath == null -> selectorElement
+        selectorElement.isEmpty() -> parentPath
+        parentPath.endsWith('/') || selectorElement.startsWith('/') -> "$parentPath$selectorElement"
+        else -> "$parentPath/$selectorElement"
+    }
+}
+
+private fun RouteSelector.toPathElement(): String = when (this) {
+    is PathSegmentConstantRouteSelector,
+    is PathSegmentParameterRouteSelector,
+    is PathSegmentOptionalParameterRouteSelector,
+    is PathSegmentTailcardRouteSelector,
+    is PathSegmentWildcardRouteSelector,
+    is PathSegmentRegexRouteSelector -> toString()
+
+    is TrailingSlashRouteSelector -> "/"
+
+    else -> ""
 }
 
 @Deprecated("Please use route scoped plugins instead")

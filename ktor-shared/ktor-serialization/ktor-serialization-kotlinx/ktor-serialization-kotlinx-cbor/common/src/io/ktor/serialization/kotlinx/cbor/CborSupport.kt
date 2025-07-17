@@ -17,6 +17,8 @@ import kotlin.native.concurrent.*
  * - defaults are serialized
  *
  * See [Cbor] for more details.
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.serialization.kotlinx.cbor.DefaultCbor)
  */
 @OptIn(ExperimentalSerializationApi::class)
 public val DefaultCbor: Cbor = Cbor {
@@ -27,7 +29,10 @@ public val DefaultCbor: Cbor = Cbor {
  * Registers the `application/cbor` (or another specified [contentType]) content type
  * to the [ContentNegotiation] plugin using kotlinx.serialization.
  *
- * You can learn more from [Content negotiation and serialization](https://ktor.io/docs/serialization.html).
+ * You can learn more from the corresponding [client](https://ktor.io/docs/client-serialization.html#register_cbor) and [server](https://ktor.io/docs/server-serialization.html#register_cbor) documentation.
+ *
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.serialization.kotlinx.cbor.cbor)
  *
  * @param cbor format instance (optional)
  * @param contentType to register with, `application/cbor` by default

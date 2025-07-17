@@ -4,14 +4,17 @@
 
 package io.ktor.server.config.yaml
 
-import io.ktor.server.config.*
-import net.mamoe.yamlkt.*
-import java.io.*
+import com.charleskorn.kaml.Yaml
+import com.charleskorn.kaml.YamlMap
+import kotlinx.serialization.decodeFromString
+import java.io.File
 
 /**
  * Loads a configuration from the YAML file, if found.
  * On JVM, loads a configuration from application resources, if exist; otherwise, reads a configuration from a file.
  * On Native, always reads a configuration from a file.
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.server.config.yaml.YamlConfig)
  */
 @Suppress("ktlint:standard:function-naming")
 public actual fun YamlConfig(path: String?): YamlConfig? {
@@ -34,10 +37,8 @@ public actual fun YamlConfig(path: String?): YamlConfig? {
 }
 
 private fun configFromString(content: String): YamlConfig {
-    val yaml = Yaml.decodeYamlFromString(content) as? YamlMap
-        ?: throw ApplicationConfigurationException("Config should be a YAML dictionary")
-
-    return YamlConfig(yaml).apply { checkEnvironmentVariables() }
+    val yaml = Yaml.default.decodeFromString<YamlMap>(content)
+    return YamlConfig.from(yaml)
 }
 
 internal actual fun getSystemPropertyOrEnvironmentVariable(key: String): String? {

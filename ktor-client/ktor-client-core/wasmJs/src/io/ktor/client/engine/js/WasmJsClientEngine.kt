@@ -4,6 +4,7 @@
 
 package io.ktor.client.engine.js
 
+import io.ktor.client.FetchOptions
 import io.ktor.client.engine.*
 import io.ktor.client.engine.js.compatibility.*
 import io.ktor.client.plugins.*
@@ -56,7 +57,8 @@ internal class JsClientEngine(
 
         val requestTime = GMTDate()
         val rawRequest = data.toRaw(clientConfig, callContext)
-        val rawResponse = commonFetch(data.url.toString(), rawRequest, config, callContext.job)
+        val requestConfig = data.attributes.getOrNull(FetchOptions.key)?.requestInit ?: {}
+        val rawResponse = commonFetch(data.url.toString(), rawRequest, requestConfig, config, callContext.job)
 
         val status = HttpStatusCode(rawResponse.status.toInt(), rawResponse.statusText)
         val headers = rawResponse.headers.mapToKtor(data.method, data.attributes)
@@ -106,6 +108,7 @@ internal class JsClientEngine(
 
         val urlString = request.url.toString()
         val socket: WebSocket = createWebSocket(urlString, request.headers)
+        val session = JsWebSocketSession(callContext, socket)
 
         try {
             socket.awaitConnection()
@@ -113,8 +116,6 @@ internal class JsClientEngine(
             callContext.cancel(CancellationException("Failed to connect to $urlString", cause))
             throw cause
         }
-
-        val session = JsWebSocketSession(callContext, socket)
 
         val protocol = socket.protocol.takeIf { it.isNotEmpty() }
         val headers = if (protocol != null) headersOf(HttpHeaders.SecWebSocketProtocol, protocol) else Headers.Empty
@@ -182,6 +183,9 @@ internal fun org.w3c.fetch.Headers.mapToKtor(method: HttpMethod, attributes: Att
 
 /**
  * Wrapper for javascript `error` objects.
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.engine.js.JsError)
+ *
  * @property origin: fail reason
  */
 @Suppress("MemberVisibilityCanBePrivate")

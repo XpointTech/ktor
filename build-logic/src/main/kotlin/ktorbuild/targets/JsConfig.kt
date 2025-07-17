@@ -5,16 +5,20 @@
 package ktorbuild.targets
 
 import ktorbuild.internal.capitalized
+import ktorbuild.internal.gradle.maybeNamed
 import ktorbuild.internal.kotlin
 import ktorbuild.internal.libs
-import ktorbuild.maybeNamed
 import org.gradle.api.Project
 import org.gradle.kotlin.dsl.invoke
+import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.targets.js.dsl.KotlinJsSubTargetDsl
 import org.jetbrains.kotlin.gradle.targets.js.dsl.KotlinJsTargetDsl
 
 internal fun KotlinJsTargetDsl.addSubTargets(targets: KtorTargets) {
-    if (targets.isEnabled("${targetName}.nodeJs")) nodejs { useMochaForTests() }
+    if (targets.isEnabled("${targetName}.nodeJs")) nodejs {
+        // Wasm uses a separate test framework. See KotlinWasmNode
+        if (platformType != KotlinPlatformType.wasm) useMochaForTests()
+    }
     if (targets.isEnabled("${targetName}.browser")) browser { useKarmaForTests() }
 }
 

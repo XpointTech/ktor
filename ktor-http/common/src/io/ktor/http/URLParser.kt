@@ -11,6 +11,8 @@ internal val ROOT_PATH = listOf("")
 /**
  * Take url parts from [urlString]
  * throws [URLParserException]
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.http.takeFrom)
  */
 public fun URLBuilder.takeFrom(urlString: String): URLBuilder {
     if (urlString.isBlank()) return this
@@ -24,6 +26,8 @@ public fun URLBuilder.takeFrom(urlString: String): URLBuilder {
 
 /**
  * Thrown when failed to parse URL
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.http.URLParserException)
  */
 public class URLParserException(urlString: String, cause: Throwable) : IllegalStateException(
     "Fail to parse url: $urlString",
@@ -40,6 +44,12 @@ internal fun URLBuilder.takeFromUnsafe(urlString: String): URLBuilder {
 
         protocol = URLProtocol.createOrDefault(scheme)
         startIndex += schemeLength + 1
+    }
+
+    // Special handling for data URLs
+    if (protocol.name == "data") {
+        host = urlString.substring(startIndex, endIndex)
+        return this
     }
 
     // Auth & Host

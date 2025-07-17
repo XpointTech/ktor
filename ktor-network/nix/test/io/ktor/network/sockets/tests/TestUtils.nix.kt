@@ -4,4 +4,6 @@
 
 package io.ktor.network.sockets.tests
 
-internal actual fun Any.supportsUnixDomainSockets(): Boolean = true
+import io.ktor.utils.io.errors.*
+
+internal actual fun Throwable.isPosixException(): Boolean = this is PosixException

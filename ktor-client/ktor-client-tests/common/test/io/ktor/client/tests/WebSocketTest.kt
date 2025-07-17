@@ -6,22 +6,24 @@ package io.ktor.client.tests
 
 import io.ktor.client.*
 import io.ktor.client.plugins.*
+import io.ktor.client.plugins.api.*
 import io.ktor.client.plugins.auth.*
 import io.ktor.client.plugins.auth.providers.*
 import io.ktor.client.plugins.websocket.*
 import io.ktor.client.request.*
+import io.ktor.client.statement.*
 import io.ktor.client.test.base.*
 import io.ktor.http.*
 import io.ktor.serialization.*
-import io.ktor.test.dispatcher.*
 import io.ktor.util.reflect.*
 import io.ktor.utils.io.charsets.*
 import io.ktor.websocket.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 import kotlin.time.Duration.Companion.seconds
 
-internal val ENGINES_WITHOUT_WS = listOf("Android", "Apache", "Apache5", "Curl", "DarwinLegacy")
+internal val ENGINES_WITHOUT_WS = listOf("Android", "Apache", "Apache5", "DarwinLegacy")
 
 private const val TEST_SIZE: Int = 100
 
@@ -55,7 +57,7 @@ class WebSocketTest : ClientLoader() {
     }
 
     @Test
-    fun testExceptionIfWebsocketIsNotInstalled() = testSuspend {
+    fun testExceptionIfWebsocketIsNotInstalled() = runTest {
         val client = HttpClient()
         assertFailsWith<IllegalStateException> {
             client.webSocketSession()
@@ -223,13 +225,25 @@ class WebSocketTest : ClientLoader() {
     }
 
     @Test
-    fun testRequestTimeoutIsNotApplied() = clientTests(except(ENGINES_WITHOUT_WS)) {
+    fun testTimeoutCapabilityIsSetIgnoringRequestTimeout() = clientTests(except(ENGINES_WITHOUT_WS)) {
+        var requestTimeouts: HttpTimeoutConfig? = null
+        val timeoutsInterceptor = createClientPlugin("TimeoutsInterceptor") {
+            on(Send) { request ->
+                requestTimeouts = request.getCapabilityOrNull(HttpTimeoutCapability)
+                proceed(request)
+            }
+        }
+
         config {
             install(WebSockets)
 
             install(HttpTimeout) {
                 requestTimeoutMillis = 10
+                connectTimeoutMillis = 1001
+                socketTimeoutMillis = 1002
             }
+
+            install(timeoutsInterceptor)
         }
 
         test { client ->
@@ -240,6 +254,11 @@ class WebSocketTest : ClientLoader() {
                 val result = incoming.receive() as Frame.Text
                 assertEquals("test", result.readText())
             }
+
+            val timeouts = assertNotNull(requestTimeouts, "Timeouts capability should be installed")
+            assertNull(timeouts.requestTimeoutMillis, "Request timeout should be ignored")
+            assertEquals(1001, timeouts.connectTimeoutMillis, "Connect timeout should be set")
+            assertEquals(1002, timeouts.socketTimeoutMillis, "Socket timeout should be set")
         }
     }
 
@@ -345,35 +364,32 @@ class WebSocketTest : ClientLoader() {
         }
     }
 
-    @Ignore // TODO KTOR-7088
     @Test
     fun testImmediateReceiveAfterConnect() = clientTests(
-        except(ENGINES_WITHOUT_WS + "Darwin" + "Js") // TODO KTOR-7088
+        except(ENGINES_WITHOUT_WS + "Darwin" + "WinHttp"), // TODO KTOR-7088
     ) {
         config {
             install(WebSockets)
         }
 
         test { client ->
-            withTimeout(10_000) {
-                coroutineScope {
-                    val defs = (1..100).map {
-                        async {
-                            client.webSocket("$TEST_WEBSOCKET_SERVER/websockets/headers") {
-                                val frame = withTimeoutOrNull(1.seconds) { incoming.receive() }
-                                assertNotNull(frame)
-                                assertIs<Frame.Text>(frame)
-                            }
+            coroutineScope {
+                val defs = (1..100).map {
+                    async {
+                        client.webSocket("$TEST_WEBSOCKET_SERVER/websockets/headers") {
+                            val frame = withTimeoutOrNull(1.seconds) { incoming.receive() }
+                            assertNotNull(frame)
+                            assertIs<Frame.Text>(frame)
                         }
                     }
-                    defs.awaitAll()
                 }
+                defs.awaitAll()
             }
         }
     }
 
     @Test
-    fun testAuthenticationWithValidRefreshToken() = clientTests(except(ENGINES_WITHOUT_WS + "Js")) {
+    fun testAuthenticationWithValidRefreshToken() = clientTests(except(ENGINES_WITHOUT_WS + "Js" + "WinHttp")) {
         config {
             install(WebSockets)
 
@@ -419,7 +435,7 @@ class WebSocketTest : ClientLoader() {
     }
 
     @Test
-    fun testAuthenticationWithInvalidToken() = clientTests(except(ENGINES_WITHOUT_WS + "Js")) {
+    fun testAuthenticationWithInvalidToken() = clientTests(except(ENGINES_WITHOUT_WS + "Js" + "WinHttp")) {
         config {
             install(WebSockets)
 
@@ -436,6 +452,23 @@ class WebSocketTest : ClientLoader() {
                 client.webSocket("$TEST_WEBSOCKET_SERVER/auth/websocket") {}
             }
             client.close()
+        }
+    }
+
+    @Test
+    fun testHttpDuringWebSocketConnection() = clientTests(except(ENGINES_WITHOUT_WS)) {
+        config {
+            install(WebSockets)
+        }
+
+        test { client ->
+            client.webSocket("$TEST_WEBSOCKET_SERVER/websockets/echo") {
+                val response = client.get("$TEST_SERVER/content/hello")
+                send(response.bodyAsText())
+
+                val frame = incoming.receive() as Frame.Text
+                assertEquals("hello", frame.readText())
+            }
         }
     }
 }

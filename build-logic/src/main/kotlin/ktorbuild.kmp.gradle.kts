@@ -2,30 +2,36 @@
  * Copyright 2014-2025 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
  */
 
-import ktorbuild.internal.gradle.*
-import ktorbuild.internal.ktorBuild
-import ktorbuild.maybeNamed
+@file:OptIn(ExperimentalKotlinGradlePluginApi::class)
+
+import ktorbuild.KtorBuildExtension
+import ktorbuild.internal.*
+import ktorbuild.internal.gradle.maybeNamed
 import ktorbuild.targets.*
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
+import org.jetbrains.kotlin.gradle.tasks.KotlinNativeLink
 
 plugins {
     id("ktorbuild.base")
     kotlin("multiplatform")
+    id("org.jetbrains.kotlinx.atomicfu")
+    id("ktorbuild.codestyle")
 }
 
 kotlin {
-    @OptIn(ExperimentalKotlinGradlePluginApi::class)
+    jvmToolchain(KtorBuildExtension.DEFAULT_JDK)
+    explicitApi()
+
+    compilerOptions {
+        apiVersion = KotlinVersion.KOTLIN_2_0
+        languageVersion = KotlinVersion.KOTLIN_2_1
+        progressiveMode = languageVersion.map { it >= KotlinVersion.DEFAULT }
+        freeCompilerArgs.addAll("-Xexpect-actual-classes")
+    }
+
     applyHierarchyTemplate(KtorTargets.hierarchyTemplate)
     addTargets(ktorBuild.targets)
-
-    // Specify JVM toolchain later to prevent it from being evaluated before it was configured.
-    // TODO: Remove `afterEvaluate` when the BCV issue triggering JVM toolchain evaluation is fixed
-    //   https://github.com/Kotlin/binary-compatibility-validator/issues/286
-    afterEvaluate {
-        jvmToolchain {
-            languageVersion = ktorBuild.jvmToolchain
-        }
-    }
 }
 
 val targets = ktorBuild.targets
@@ -46,12 +52,24 @@ if (targets.hasJsOrWasmJs) {
 @Suppress("UnstableApiUsage")
 if (targets.hasNative) {
     tasks.maybeNamed("linkDebugTestLinuxX64") {
-        onlyIf("run only on Linux") { ktorBuild.os.get().isLinux() }
+        val os = ktorBuild.os.get()
+        onlyIf("run only on Linux") { os.isLinux }
     }
     tasks.maybeNamed("linkDebugTestLinuxArm64") {
-        onlyIf("run only on Linux") { ktorBuild.os.get().isLinux() }
+        val os = ktorBuild.os.get()
+        onlyIf("run only on Linux") { os.isLinux }
     }
     tasks.maybeNamed("linkDebugTestMingwX64") {
-        onlyIf("run only on Windows") { ktorBuild.os.get().isWindows() }
+        val os = ktorBuild.os.get()
+        onlyIf("run only on Windows") { os.isWindows }
     }
+
+    // A workaround for KT-70915
+    tasks.withType<KotlinNativeLink>()
+        .configureEach { withLimitedParallelism("native-link", maxParallelTasks = 1) }
+    // A workaround for KT-77609
+    tasks.matching { it::class.simpleName?.startsWith("CInteropCommonizerTask") == true }
+        .configureEach { withLimitedParallelism("cinterop-commonizer", maxParallelTasks = 1) }
 }
+
+if (ktorBuild.isCI.get()) configureTestTasksOnCi()

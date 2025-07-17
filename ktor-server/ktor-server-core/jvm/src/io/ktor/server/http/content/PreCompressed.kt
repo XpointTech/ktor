@@ -20,6 +20,8 @@ import kotlin.io.path.*
  * Supported pre compressed file types and associated extensions
  *
  * **See Also:** [Accept-Encoding](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Accept-Encoding)
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.server.http.content.CompressedFileType)
  */
 public enum class CompressedFileType(public val extension: String, public val encoding: String = extension) {
     BROTLI("br"),
@@ -133,6 +135,10 @@ internal suspend fun ApplicationCall.respondStaticFile(
     suppressCompression()
     val compressedFile = File("${requestedFile.absolutePath}.${bestCompressionFit.extension}")
     if (cacheControlValues.isNotEmpty()) response.header(HttpHeaders.CacheControl, cacheControlValues)
+    response.header(
+        HttpHeaders.Vary,
+        response.headers[HttpHeaders.Vary]?.plus(", ${HttpHeaders.AcceptEncoding}") ?: HttpHeaders.AcceptEncoding
+    )
     modify(requestedFile, this)
     val localFileContent = LocalFileContent(compressedFile, contentType(requestedFile))
     respond(PreCompressedResponse(localFileContent, bestCompressionFit.encoding))
@@ -193,6 +199,10 @@ internal suspend fun ApplicationCall.respondStaticResource(
         suppressCompression()
         val cacheControlValues = cacheControl(bestCompressionFit.url).joinToString(", ")
         if (cacheControlValues.isNotEmpty()) response.header(HttpHeaders.CacheControl, cacheControlValues)
+        response.header(
+            HttpHeaders.Vary,
+            response.headers[HttpHeaders.Vary]?.plus(", ${HttpHeaders.AcceptEncoding}") ?: HttpHeaders.AcceptEncoding
+        )
         modifier(bestCompressionFit.url, this)
         respond(PreCompressedResponse(bestCompressionFit.content, bestCompressionFit.compression.encoding))
         return

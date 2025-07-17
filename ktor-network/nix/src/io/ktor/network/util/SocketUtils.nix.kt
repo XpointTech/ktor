@@ -59,7 +59,7 @@ internal actual fun sockaddr.toNativeSocketAddress(): NativeSocketAddress = when
         val address = ptr.reinterpret<sockaddr_in6>().pointed
         NativeIPv6SocketAddress(
             address.sin6_family.convert(),
-            address.sin6_addr,
+            address.sin6_addr.readValue(),
             networkToHostOrder(address.sin6_port).toInt(),
             address.sin6_flowinfo,
             address.sin6_scope_id
@@ -153,4 +153,8 @@ internal actual fun getSocketError(): Int {
 
 internal actual fun isWouldBlockError(error: Int): Boolean {
     return error == EAGAIN || error == EWOULDBLOCK || error == EINPROGRESS
+}
+
+internal actual fun closeSocketDescriptor(descriptor: Int): Int {
+    return close(descriptor)
 }

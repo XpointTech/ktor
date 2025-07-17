@@ -17,6 +17,9 @@ import kotlin.properties.*
 /**
  * Creates a RAW web socket session from connection
  *
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.websocket.RawWebSocket)
+ *
  * @param input is a [ByteReadChannel] of connection
  * @param output is a [ByteWriteChannel] of connection
  * @param maxFrameSize is an initial [maxFrameSize] value for [WebSocketSession]
@@ -68,10 +71,10 @@ internal class RawWebSocketJvm(
                     filtered.send(frame)
                 }
             } catch (cause: FrameTooBigException) {
-                outgoing.send(Frame.Close(CloseReason(CloseReason.Codes.TOO_BIG, cause.message)))
+                outgoing.trySend(Frame.Close(CloseReason(CloseReason.Codes.TOO_BIG, cause.message)))
                 filtered.close(cause)
             } catch (cause: ProtocolViolationException) {
-                outgoing.send(Frame.Close(CloseReason(CloseReason.Codes.PROTOCOL_ERROR, cause.message)))
+                outgoing.trySend(Frame.Close(CloseReason(CloseReason.Codes.PROTOCOL_ERROR, cause.message)))
                 filtered.close(cause)
             } catch (cause: CancellationException) {
                 reader.incoming.cancel(cause)

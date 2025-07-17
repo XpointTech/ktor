@@ -12,15 +12,15 @@ import io.ktor.client.plugins.cache.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import io.ktor.util.*
 import io.ktor.util.date.*
 import io.ktor.utils.io.*
 import io.ktor.utils.io.core.*
-import kotlinx.coroutines.*
 import kotlin.coroutines.*
 
 /**
  * Cache storage interface.
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.plugins.cache.storage.HttpCacheStorage)
  */
 @Deprecated("Use new [CacheStorage] instead.", level = DeprecationLevel.ERROR)
 @Suppress("DEPRECATION_ERROR")
@@ -28,27 +28,37 @@ public abstract class HttpCacheStorage {
 
     /**
      * Store [value] in cache storage for [url] key.
+     *
+     * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.plugins.cache.storage.HttpCacheStorage.store)
      */
     public abstract fun store(url: Url, value: HttpCacheEntry)
 
     /**
      * Find valid entry in cache storage with additional [varyKeys].
+     *
+     * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.plugins.cache.storage.HttpCacheStorage.find)
      */
     public abstract fun find(url: Url, varyKeys: Map<String, String>): HttpCacheEntry?
 
     /**
      * Find all matched [HttpCacheEntry] for [url].
+     *
+     * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.plugins.cache.storage.HttpCacheStorage.findByUrl)
      */
     public abstract fun findByUrl(url: Url): Set<HttpCacheEntry>
 
     public companion object {
         /**
          * Default unlimited cache storage.
+         *
+         * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.plugins.cache.storage.HttpCacheStorage.Companion.Unlimited)
          */
         public val Unlimited: () -> HttpCacheStorage = { UnlimitedCacheStorage() }
 
         /**
          * Disabled cache always empty and store nothing.
+         *
+         * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.plugins.cache.storage.HttpCacheStorage.Companion.Disabled)
          */
         public val Disabled: HttpCacheStorage = DisabledCacheStorage
     }
@@ -63,32 +73,58 @@ internal suspend fun HttpCacheStorage.store(url: Url, value: HttpResponse, isSha
 
 /**
  * Cache storage interface.
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.plugins.cache.storage.CacheStorage)
  */
 public interface CacheStorage {
 
     /**
      * Store [value] in cache storage for [url] key.
+     *
+     * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.plugins.cache.storage.CacheStorage.store)
      */
     public suspend fun store(url: Url, data: CachedResponseData)
 
     /**
      * Find valid entry in cache storage with additional [varyKeys].
+     *
+     * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.plugins.cache.storage.CacheStorage.find)
      */
     public suspend fun find(url: Url, varyKeys: Map<String, String>): CachedResponseData?
 
     /**
      * Find all matched [HttpCacheEntry] for [url].
+     *
+     * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.plugins.cache.storage.CacheStorage.findAll)
      */
     public suspend fun findAll(url: Url): Set<CachedResponseData>
+
+    /**
+     * Remove from cache storage the entry matching [url] with additional [varyKeys].
+     *
+     * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.plugins.cache.storage.CacheStorage.remove)
+     */
+    public suspend fun remove(url: Url, varyKeys: Map<String, String>)
+
+    /**
+     * Remove all matched [HttpCacheEntry] for [url].
+     *
+     * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.plugins.cache.storage.CacheStorage.removeAll)
+     */
+    public suspend fun removeAll(url: Url)
 
     public companion object {
         /**
          * Default unlimited cache storage.
+         *
+         * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.plugins.cache.storage.CacheStorage.Companion.Unlimited)
          */
         public val Unlimited: () -> CacheStorage = { UnlimitedStorage() }
 
         /**
          * Disabled cache always empty and store nothing.
+         *
+         * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.plugins.cache.storage.CacheStorage.Companion.Disabled)
          */
         public val Disabled: CacheStorage = DisabledStorage
     }
@@ -96,6 +132,8 @@ public interface CacheStorage {
 
 /**
  * Store [response] in cache storage.
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.plugins.cache.storage.store)
  */
 @Deprecated(
     message = "Please use method with `response.varyKeys()` and `isShared` arguments",
@@ -108,6 +146,8 @@ public suspend fun CacheStorage.store(response: HttpResponse): CachedResponseDat
 
 /**
  * Store [response] with [varyKeys] in cache storage.
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.plugins.cache.storage.store)
  */
 @OptIn(InternalAPI::class)
 public suspend fun CacheStorage.store(
@@ -154,6 +194,8 @@ internal fun CachedResponseData.createResponse(
 
 /**
  * Cached representation of response
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.plugins.cache.storage.CachedResponseData)
  */
 public class CachedResponseData(
     public val url: Url,

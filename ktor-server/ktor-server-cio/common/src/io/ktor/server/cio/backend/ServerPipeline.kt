@@ -9,6 +9,8 @@ import io.ktor.http.cio.*
 import io.ktor.http.cio.internals.*
 import io.ktor.server.cio.*
 import io.ktor.util.cio.*
+import io.ktor.util.logging.KtorSimpleLogger
+import io.ktor.util.logging.trace
 import io.ktor.utils.io.*
 import io.ktor.utils.io.charsets.*
 import io.ktor.utils.io.core.*
@@ -18,9 +20,14 @@ import kotlinx.coroutines.channels.*
 import kotlinx.io.*
 import kotlin.time.*
 
+private val LOGGER = KtorSimpleLogger("io.ktor.server.cio.backend.ServerPipeline")
+
 /**
  * Start connection HTTP pipeline invoking [handler] for every request.
  * Note that [handler] could be invoked multiple times concurrently due to HTTP pipeline nature
+ *
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.server.cio.backend.startServerConnectionPipeline)
  *
  * @param connection incoming client connection info
  * @param timeout number of IDLE seconds after the connection will be closed
@@ -64,6 +71,7 @@ public fun CoroutineScope.startServerConnectionPipeline(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (parseFailed: Throwable) {
+                LOGGER.trace { "Request parsing failed with exception: $parseFailed" }
                 // try to write 400 Bad Request
                 respondBadRequest(actorChannel)
                 break // end pipeline loop
@@ -89,17 +97,14 @@ public fun CoroutineScope.startServerConnectionPipeline(
             }
 
             try {
-                val contentLengthIndex = request.headers.find("Content-Length")
+                val contentLengthHeaders = request.headers.getAll("Content-Length").toList()
                 connectionOptions = ConnectionOptions.parse(request.headers["Connection"])
-
-                if (contentLengthIndex != -1) {
-                    contentLength = request.headers.valueAt(contentLengthIndex).parseDecLong()
-                    if (request.headers.find("Content-Length", contentLengthIndex + 1) != -1) {
-                        throw ParserException("Duplicate Content-Length header")
-                    }
-                } else {
-                    contentLength = -1
+                if (contentLengthHeaders.size > 1) {
+                    throw ParserException("Duplicate Content-Length header")
                 }
+
+                contentLength = if (contentLengthHeaders.size == 1) contentLengthHeaders[0].parseDecLong() else -1
+
                 expectedHttpBody = expectHttpBody(
                     request.method,
                     contentLength,

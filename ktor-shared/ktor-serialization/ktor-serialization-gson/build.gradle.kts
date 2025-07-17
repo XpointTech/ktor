@@ -1,22 +1,24 @@
 /*
- * Copyright 2014-2024 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
+ * Copyright 2014-2025 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
  */
 
 description = ""
 
-kotlin.sourceSets {
-    jvmMain {
-        dependencies {
-            api(project(":ktor-shared:ktor-serialization"))
+plugins {
+    id("ktorbuild.project.library")
+}
+
+kotlin {
+    sourceSets {
+        jvmMain.dependencies {
+            api(projects.ktorSerialization)
             api(libs.gson)
         }
-    }
-    jvmTest {
-        dependencies {
-            api(project(":ktor-server:ktor-server-test-host"))
-            api(project(":ktor-client:ktor-client-tests"))
-            api(project(":ktor-client:ktor-client-plugins:ktor-client-content-negotiation:ktor-client-content-negotiation-tests")) // ktlint-disable max-line-length
-            api(project(":ktor-shared:ktor-serialization:ktor-serialization-tests"))
+        jvmTest.dependencies {
+            api(projects.ktorServerTestHost)
+            api(projects.ktorClientTests)
+            api(projects.ktorClientContentNegotiationTests)
+            api(projects.ktorSerializationTests)
 
             api(libs.logback.classic)
         }

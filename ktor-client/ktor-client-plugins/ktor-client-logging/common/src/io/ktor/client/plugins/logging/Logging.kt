@@ -1,13 +1,13 @@
 /*
- * Copyright 2014-2024 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
+ * Copyright 2014-2025 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
  */
 
 package io.ktor.client.plugins.logging
 
 import io.ktor.client.*
 import io.ktor.client.call.*
+import io.ktor.client.plugins.*
 import io.ktor.client.plugins.api.*
-import io.ktor.client.plugins.isSaved
 import io.ktor.client.plugins.observer.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -18,13 +18,8 @@ import io.ktor.util.*
 import io.ktor.util.pipeline.*
 import io.ktor.utils.io.*
 import io.ktor.utils.io.charsets.*
-import io.ktor.utils.io.core.readText
-import io.ktor.utils.io.core.writeFully
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.async
-import kotlinx.coroutines.launch
+import io.ktor.utils.io.core.*
+import kotlinx.coroutines.*
 import kotlinx.io.Buffer
 
 private val ClientCallLogger = AttributeKey<HttpClientCallLogger>("CallLogger")
@@ -36,12 +31,16 @@ public enum class LoggingFormat {
     /**
      * [OkHttp logging format](https://github.com/square/okhttp/blob/parent-4.12.0/okhttp-logging-interceptor/src/main/kotlin/okhttp3/logging/HttpLoggingInterceptor.kt#L48-L105).
      * Writes only application-level logs because the low-level HTTP communication is hidden within the engine implementations.
+     *
+     * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.plugins.logging.LoggingFormat.OkHttp)
      */
     OkHttp
 }
 
 /**
  * A configuration for the [Logging] plugin.
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.plugins.logging.LoggingConfig)
  */
 @KtorDsl
 public class LoggingConfig {
@@ -50,11 +49,17 @@ public class LoggingConfig {
 
     private var _logger: Logger? = null
 
-    /** A general format for logging requests and responses. See [LoggingFormat]. */
+    /**
+     * A general format for logging requests and responses. See [LoggingFormat].
+     *
+     * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.plugins.logging.LoggingConfig.format)
+     */
     public var format: LoggingFormat = LoggingFormat.Default
 
     /**
      * Specifies a [Logger] instance.
+     *
+     * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.plugins.logging.LoggingConfig.logger)
      */
     public var logger: Logger
         get() = _logger ?: Logger.DEFAULT
@@ -64,11 +69,15 @@ public class LoggingConfig {
 
     /**
      * Specifies the logging level.
+     *
+     * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.plugins.logging.LoggingConfig.level)
      */
     public var level: LogLevel = LogLevel.HEADERS
 
     /**
      * Allows you to filter log messages for calls matching a [predicate].
+     *
+     * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.plugins.logging.LoggingConfig.filter)
      */
     public fun filter(predicate: (HttpRequestBuilder) -> Boolean) {
         filters.add(predicate)
@@ -80,6 +89,8 @@ public class LoggingConfig {
      * ```kotlin
      * sanitizeHeader { header -> header == HttpHeaders.Authorization }
      * ```
+     *
+     * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.plugins.logging.LoggingConfig.sanitizeHeader)
      */
     public fun sanitizeHeader(placeholder: String = "***", predicate: (String) -> Boolean) {
         sanitizedHeaders.add(SanitizedHeader(placeholder, predicate))
@@ -90,6 +101,8 @@ public class LoggingConfig {
  * A client's plugin that provides the capability to log HTTP calls.
  *
  * You can learn more from [Logging](https://ktor.io/docs/client-logging.html).
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.plugins.logging.Logging)
  */
 @OptIn(InternalAPI::class, DelicateCoroutinesApi::class)
 public val Logging: ClientPlugin<LoggingConfig> = createClientPlugin("Logging", ::LoggingConfig) {
@@ -138,17 +151,25 @@ public val Logging: ClientPlugin<LoggingConfig> = createClientPlugin("Logging", 
         }
 
         val buffer = Buffer().apply { writeFully(firstChunk, 0, firstReadSize) }
-        val firstChunkText = charset.newDecoder().decode(buffer, firstReadSize)
 
-        var lastCharIndex = -1
-        for (ch in firstChunkText) {
-            lastCharIndex += 1
+        val firstChunkText = try {
+            charset.newDecoder().decode(buffer)
+        } catch (_: MalformedInputException) {
+            isBinary = true
+            ""
         }
 
-        for ((i, ch) in firstChunkText.withIndex()) {
-            if (ch == '\ufffd' && i != lastCharIndex) {
-                isBinary = true
-                break
+        if (!isBinary) {
+            var lastCharIndex = -1
+            for (ch in firstChunkText) {
+                lastCharIndex += 1
+            }
+
+            for ((i, ch) in firstChunkText.withIndex()) {
+                if (ch == '\ufffd' && i != lastCharIndex) {
+                    isBinary = true
+                    break
+                }
             }
         }
 
@@ -173,6 +194,7 @@ public val Logging: ClientPlugin<LoggingConfig> = createClientPlugin("Logging", 
         contentLength: Long?,
         headers: Headers,
         method: HttpMethod,
+        logLines: MutableList<String>,
         body: ByteReadChannel
     ) {
         val (isBinary, size, newBody) = detectIfBinary(body, contentLength, content.contentType, headers)
@@ -185,8 +207,8 @@ public val Logging: ClientPlugin<LoggingConfig> = createClientPlugin("Logging", 
                 Charsets.UTF_8
             }
 
-            logger.log(newBody.readRemaining().readText(charset = charset))
-            logger.log("--> END ${method.value} ($size-byte body)")
+            logLines.add(newBody.readRemaining().readText(charset = charset))
+            logLines.add("--> END ${method.value} ($size-byte body)")
         } else {
             var type = "binary"
             if (headers.contains(HttpHeaders.ContentEncoding)) {
@@ -194,9 +216,9 @@ public val Logging: ClientPlugin<LoggingConfig> = createClientPlugin("Logging", 
             }
 
             if (size != null) {
-                logger.log("--> END ${method.value} ($type $size-byte body omitted)")
+                logLines.add("--> END ${method.value} ($type $size-byte body omitted)")
             } else {
-                logger.log("--> END ${method.value} ($type body omitted)")
+                logLines.add("--> END ${method.value} ($type body omitted)")
             }
         }
     }
@@ -205,30 +227,36 @@ public val Logging: ClientPlugin<LoggingConfig> = createClientPlugin("Logging", 
         content: OutgoingContent,
         method: HttpMethod,
         headers: Headers,
+        logLines: MutableList<String>,
         process: (ByteReadChannel) -> ByteReadChannel = { it }
     ): OutgoingContent? {
         return when (content) {
             is OutgoingContent.ByteArrayContent -> {
                 val bytes = content.bytes()
-                logRequestBody(content, bytes.size.toLong(), headers, method, ByteReadChannel(bytes))
+                logRequestBody(content, bytes.size.toLong(), headers, method, logLines, ByteReadChannel(bytes))
                 null
             }
+
             is OutgoingContent.ContentWrapper -> {
-                logOutgoingContent(content.delegate(), method, headers, process)
+                logOutgoingContent(content.delegate(), method, headers, logLines, process)
             }
+
             is OutgoingContent.NoContent -> {
-                logger.log("--> END ${method.value}")
+                logLines.add("--> END ${method.value}")
                 null
             }
+
             is OutgoingContent.ProtocolUpgrade -> {
-                logger.log("--> END ${method.value}")
+                logLines.add("--> END ${method.value}")
                 null
             }
+
             is OutgoingContent.ReadChannelContent -> {
                 val (origChannel, newChannel) = content.readFrom().split(client)
-                logRequestBody(content, content.contentLength, headers, method, newChannel)
+                logRequestBody(content, content.contentLength, headers, method, logLines, newChannel)
                 LoggedContent(content, origChannel)
             }
+
             is OutgoingContent.WriteChannelContent -> {
                 val channel = ByteChannel()
 
@@ -238,13 +266,13 @@ public val Logging: ClientPlugin<LoggingConfig> = createClientPlugin("Logging", 
                 }
 
                 val (origChannel, newChannel) = channel.split(client)
-                logRequestBody(content, content.contentLength, headers, method, newChannel)
+                logRequestBody(content, content.contentLength, headers, method, logLines, newChannel)
                 LoggedContent(content, origChannel)
             }
         }
     }
 
-    suspend fun logRequestOkHttpFormat(request: HttpRequestBuilder): OutgoingContent? {
+    suspend fun logRequestOkHttpFormat(request: HttpRequestBuilder, logLines: MutableList<String>): OutgoingContent? {
         if (isNone()) return null
 
         val uri = URLBuilder().takeFrom(request.url).build().pathQuery()
@@ -279,12 +307,12 @@ public val Logging: ClientPlugin<LoggingConfig> = createClientPlugin("Logging", 
                 body is OutgoingContent.ReadChannelContent -> "--> ${request.method.value} $uri (unknown-byte body)"
 
             else -> {
-                val size = computeRequestBodySize(request.body, headers)
+                val size = computeRequestBodySize(request.body)
                 "--> ${request.method.value} $uri ($size-byte body)"
             }
         }
 
-        logger.log(startLine)
+        logLines.add(startLine)
 
         if (!isHeaders() && !isBody()) {
             return null
@@ -292,37 +320,37 @@ public val Logging: ClientPlugin<LoggingConfig> = createClientPlugin("Logging", 
 
         for ((name, values) in headers.entries()) {
             if (sanitizedHeaders.find { sh -> sh.predicate(name) } == null) {
-                logger.log("$name: ${values.joinToString(separator = ", ")}")
+                logLines.add("$name: ${values.joinToString(separator = ", ")}")
             } else {
-                logger.log("$name: ██")
+                logLines.add("$name: ██")
             }
         }
 
         if (!isBody() || request.method == HttpMethod.Get || request.method == HttpMethod.Head) {
-            logger.log("--> END ${request.method.value}")
+            logLines.add("--> END ${request.method.value}")
             return null
         }
 
-        logger.log("")
+        logLines.add("")
 
         if (body !is OutgoingContent) {
-            logger.log("--> END ${request.method.value}")
+            logLines.add("--> END ${request.method.value}")
             return null
         }
 
         val newContent = if (request.headers[HttpHeaders.ContentEncoding] == "gzip") {
-            logOutgoingContent(body, request.method, headers) { channel ->
+            logOutgoingContent(body, request.method, headers, logLines) { channel ->
                 GZipEncoder.decode(channel)
             }
         } else {
-            logOutgoingContent(body, request.method, headers)
+            logOutgoingContent(body, request.method, headers, logLines)
         }
 
         return newContent
     }
 
-    suspend fun logResponseBody(response: HttpResponse, body: ByteReadChannel) {
-        logger.log("")
+    suspend fun logResponseBody(response: HttpResponse, body: ByteReadChannel, logLines: MutableList<String>) {
+        logLines.add("")
 
         val (isBinary, size, newBody) = detectIfBinary(
             body,
@@ -333,7 +361,7 @@ public val Logging: ClientPlugin<LoggingConfig> = createClientPlugin("Logging", 
         val duration = response.responseTime.timestamp - response.requestTime.timestamp
 
         if (size == 0L) {
-            logger.log("<-- END HTTP (${duration}ms, $size-byte body)")
+            logLines.add("<-- END HTTP (${duration}ms, $size-byte body)")
             return
         }
 
@@ -345,8 +373,8 @@ public val Logging: ClientPlugin<LoggingConfig> = createClientPlugin("Logging", 
                 Charsets.UTF_8
             }
 
-            logger.log(newBody.readRemaining().readText(charset = charset))
-            logger.log("<-- END HTTP (${duration}ms, $size-byte body)")
+            logLines.add(newBody.readRemaining().readText(charset = charset))
+            logLines.add("<-- END HTTP (${duration}ms, $size-byte body)")
         } else {
             var type = "binary"
             if (response.headers.contains(HttpHeaders.ContentEncoding)) {
@@ -354,14 +382,14 @@ public val Logging: ClientPlugin<LoggingConfig> = createClientPlugin("Logging", 
             }
 
             if (size != null) {
-                logger.log("<-- END HTTP (${duration}ms, $type $size-byte body omitted)")
+                logLines.add("<-- END HTTP (${duration}ms, $type $size-byte body omitted)")
             } else {
-                logger.log("<-- END HTTP (${duration}ms, $type body omitted)")
+                logLines.add("<-- END HTTP (${duration}ms, $type body omitted)")
             }
         }
     }
 
-    suspend fun logResponseOkHttpFormat(response: HttpResponse): HttpResponse {
+    suspend fun logResponseOkHttpFormat(response: HttpResponse, logLines: MutableList<String>): HttpResponse {
         if (isNone()) return response
 
         val contentLength = response.headers[HttpHeaders.ContentLength]?.toLongOrNull()
@@ -385,7 +413,7 @@ public val Logging: ClientPlugin<LoggingConfig> = createClientPlugin("Logging", 
             else -> "<-- ${response.status} ${request.url.pathQuery()} (${duration}ms, unknown-byte body)"
         }
 
-        logger.log(startLine)
+        logLines.add(startLine)
 
         if (!isHeaders() && !isBody()) {
             return response
@@ -393,37 +421,37 @@ public val Logging: ClientPlugin<LoggingConfig> = createClientPlugin("Logging", 
 
         for ((name, values) in response.headers.entries()) {
             if (sanitizedHeaders.find { sh -> sh.predicate(name) } == null) {
-                logger.log("$name: ${values.joinToString(separator = ", ")}")
+                logLines.add("$name: ${values.joinToString(separator = ", ")}")
             } else {
-                logger.log("$name: ██")
+                logLines.add("$name: ██")
             }
         }
 
         if (!isBody()) {
-            logger.log("<-- END HTTP")
+            logLines.add("<-- END HTTP")
             return response
         }
 
         if (contentLength != null && contentLength == 0L) {
-            logger.log("<-- END HTTP (${duration}ms, $contentLength-byte body)")
+            logLines.add("<-- END HTTP (${duration}ms, $contentLength-byte body)")
             return response
         }
 
         if (response.contentType() == ContentType.Text.EventStream) {
-            logger.log("<-- END HTTP (streaming)")
+            logLines.add("<-- END HTTP (streaming)")
             return response
         }
 
         if (response.isSaved) {
-            logResponseBody(response, response.rawContent)
+            logResponseBody(response, response.rawContent, logLines)
             return response
         }
 
         val (origChannel, newChannel) = response.rawContent.split(response)
 
-        logResponseBody(response, newChannel)
+        logResponseBody(response, newChannel, logLines)
 
-        val call = response.call.wrapWithContent(origChannel)
+        val call = response.call.replaceResponse { origChannel }
         return call.response
     }
 
@@ -515,7 +543,12 @@ public val Logging: ClientPlugin<LoggingConfig> = createClientPlugin("Logging", 
         }
 
         if (okHttpFormat) {
-            val content = logRequestOkHttpFormat(request)
+            val requestLogLines = mutableListOf<String>()
+            val content = logRequestOkHttpFormat(request, requestLogLines)
+
+            if (requestLogLines.size > 0) {
+                logger.log(requestLogLines.joinToString(separator = "\n"))
+            }
 
             try {
                 if (content != null) {
@@ -548,7 +581,13 @@ public val Logging: ClientPlugin<LoggingConfig> = createClientPlugin("Logging", 
 
     on(ResponseAfterEncodingHook) { response ->
         if (okHttpFormat) {
-            val newResponse = logResponseOkHttpFormat(response)
+            val responseLogLines = mutableListOf<String>()
+            val newResponse = logResponseOkHttpFormat(response, responseLogLines)
+
+            if (responseLogLines.size > 0) {
+                logger.log(responseLogLines.joinToString(separator = "\n"))
+            }
+
             if (newResponse != response) {
                 proceedWith(newResponse)
             }
@@ -573,7 +612,13 @@ public val Logging: ClientPlugin<LoggingConfig> = createClientPlugin("Logging", 
             throw cause
         } finally {
             callLogger.logResponseHeader(header.toString())
-            if (failed || !level.body) callLogger.closeResponseLog()
+            if (failed || !level.body) {
+                callLogger.closeResponseLog()
+            } else if (level.body && response.isSaved) {
+                // Log only saved response body here. Streaming responses are logged via ResponseObserver
+                callLogger.logResponseBody(response)
+                callLogger.closeResponseLog()
+            }
         }
     }
 
@@ -600,24 +645,19 @@ public val Logging: ClientPlugin<LoggingConfig> = createClientPlugin("Logging", 
 
     if (!level.body) return@createClientPlugin
 
-    @OptIn(InternalAPI::class)
-    val observer: ResponseHandler = observer@{
-        if (level == LogLevel.NONE || it.call.attributes.contains(DisableLogging)) {
-            return@observer
-        }
+    val responseObserver = ResponseObserver.prepare {
+        // Use observer to log streaming responses (responses that aren't saved in memory)
+        filter { !it.response.isSaved }
 
-        val callLogger = it.call.attributes[ClientCallLogger]
-        val log = StringBuilder()
-        try {
-            logResponseBody(log, it.contentType(), it.rawContent)
-        } catch (_: Throwable) {
-        } finally {
-            callLogger.logResponseBody(log.toString().trim())
+        onResponse { response ->
+            if (level == LogLevel.NONE || response.call.attributes.contains(DisableLogging)) return@onResponse
+
+            val callLogger = response.call.attributes[ClientCallLogger]
+            callLogger.logResponseBody(response)
             callLogger.closeResponseLog()
         }
     }
-
-    ResponseObserver.install(ResponseObserver.prepare { onResponse(observer) }, client)
+    ResponseObserver.install(responseObserver, client)
 }
 
 private fun Url.pathQuery(): String {
@@ -635,13 +675,12 @@ private fun Url.pathQuery(): String {
     }
 }
 
-@OptIn(DelicateCoroutinesApi::class)
-private fun computeRequestBodySize(content: Any, headers: Headers): Long {
+private fun computeRequestBodySize(content: Any): Long {
     check(content is OutgoingContent)
 
     return when (content) {
         is OutgoingContent.ByteArrayContent -> content.bytes().size.toLong()
-        is OutgoingContent.ContentWrapper -> computeRequestBodySize(content.delegate(), content.headers)
+        is OutgoingContent.ContentWrapper -> computeRequestBodySize(content.delegate())
         is OutgoingContent.NoContent -> 0
         is OutgoingContent.ProtocolUpgrade -> 0
         else -> error("Unable to calculate the size for type ${content::class.simpleName}")
@@ -650,6 +689,8 @@ private fun computeRequestBodySize(content: Any, headers: Headers): Long {
 
 /**
  * Configures and installs [Logging] in [HttpClient].
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.plugins.logging.Logging)
  */
 @Suppress("FunctionName")
 public fun HttpClientConfig<*>.Logging(block: LoggingConfig.() -> Unit = {}) {

@@ -1,21 +1,25 @@
 /*
-* Copyright 2014-2021 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
-*/
+ * Copyright 2014-2025 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
+ */
 
 package io.ktor.client.plugins.observer
 
 import io.ktor.client.*
 import io.ktor.client.call.*
+import io.ktor.client.plugins.*
 import io.ktor.client.plugins.api.*
 import io.ktor.client.statement.*
 import io.ktor.util.*
 import io.ktor.util.pipeline.*
 import io.ktor.utils.io.*
-import kotlinx.coroutines.*
-import kotlin.coroutines.*
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlin.coroutines.CoroutineContext
 
 /**
  * [ResponseObserver] callback.
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.plugins.observer.ResponseHandler)
  */
 public typealias ResponseHandler = suspend (HttpResponse) -> Unit
 
@@ -27,6 +31,8 @@ public class ResponseObserverConfig {
 
     /**
      * Set response handler for logging.
+     *
+     * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.plugins.observer.ResponseObserverConfig.onResponse)
      */
     public fun onResponse(block: ResponseHandler) {
         responseHandler = block
@@ -34,6 +40,8 @@ public class ResponseObserverConfig {
 
     /**
      * Set filter predicate to dynamically control if interceptor is executed or not for each http call.
+     *
+     * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.plugins.observer.ResponseObserverConfig.filter)
      */
     public fun filter(block: ((HttpClientCall) -> Boolean)) {
         filter = block
@@ -42,6 +50,8 @@ public class ResponseObserverConfig {
 
 /**
  * Observe response plugin.
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.plugins.observer.ResponseObserver)
  */
 @OptIn(InternalAPI::class)
 public val ResponseObserver: ClientPlugin<ResponseObserverConfig> = createClientPlugin(
@@ -55,18 +65,23 @@ public val ResponseObserver: ClientPlugin<ResponseObserverConfig> = createClient
     on(AfterReceiveHook) { response ->
         if (filter?.invoke(response.call) == false) return@on
 
+        if (response.isSaved) {
+            withContext(getResponseObserverContext()) {
+                runCatching { responseHandler(response) }
+            }
+            proceedWith(response)
+            return@on
+        }
+
         val (loggingContent, responseContent) = response.rawContent.split(response)
 
-        val newResponse = response.call.wrapWithContent(responseContent).response
-        val sideResponse = response.call.wrapWithContent(loggingContent).response
+        val newResponse = response.call.replaceResponse { responseContent }.response
+        val sideResponse = response.call.replaceResponse { loggingContent }.response
 
+        // Launch responseHandler in parallel as we don't want to wait for its finish for streaming responses
         client.launch(getResponseObserverContext()) {
             runCatching { responseHandler(sideResponse) }
-
-            val content = sideResponse.rawContent
-            if (!content.isClosedForRead) {
-                runCatching { content.discard() }
-            }
+            runCatching { sideResponse.rawContent.discard() }
         }
 
         proceedWith(newResponse)
@@ -90,6 +105,8 @@ internal expect suspend fun getResponseObserverContext(): CoroutineContext
 
 /**
  * Install [ResponseObserver] plugin in client.
+ *
+ * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.plugins.observer.ResponseObserver)
  */
 @Suppress("FunctionName")
 public fun HttpClientConfig<*>.ResponseObserver(block: ResponseHandler) {

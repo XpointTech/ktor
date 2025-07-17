@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2024 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
+ * Copyright 2014-2025 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
  */
 
 package io.ktor.server.engine
@@ -12,17 +12,23 @@ import io.ktor.server.engine.internal.*
 import io.ktor.util.*
 import io.ktor.util.logging.*
 import io.ktor.util.pipeline.*
+import io.ktor.util.reflect.*
 import io.ktor.utils.io.*
 import io.ktor.utils.io.core.*
 import kotlinx.coroutines.*
-import java.io.*
-import java.net.*
+import java.io.File
+import java.net.URL
+import java.net.URLDecoder
 import java.nio.file.*
 import java.nio.file.StandardWatchEventKinds.*
-import java.nio.file.attribute.*
-import java.util.concurrent.*
-import java.util.concurrent.locks.*
-import kotlin.concurrent.*
+import java.nio.file.attribute.BasicFileAttributes
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.locks.ReentrantReadWriteLock
+import kotlin.concurrent.getOrSet
+import kotlin.concurrent.read
+import kotlin.concurrent.write
+
+private typealias ApplicationModule = suspend Application.() -> Unit
 
 public actual class EmbeddedServer<
     TEngine : ApplicationEngine,
@@ -34,6 +40,7 @@ actual constructor(
     engineConfigBlock: TConfiguration.() -> Unit
 ) {
 
+    @Suppress("DEPRECATION")
     public actual val monitor: Events = rootConfig.environment.monitor
 
     public actual val environment: ApplicationEnvironment = rootConfig.environment
@@ -50,11 +57,14 @@ actual constructor(
     private val configuredWatchPath = environment.config.propertyOrNull("ktor.deployment.watch")?.getList().orEmpty()
     private val watchPatterns: List<String> = configuredWatchPath + rootConfig.watchPaths
 
-    private val configModulesNames: List<String> = run {
-        environment.config.propertyOrNull("ktor.application.modules")?.getList() ?: emptyList()
+    @OptIn(InternalAPI::class)
+    private val moduleInjector: ModuleParametersInjector by lazy {
+        loadServiceOrNull() ?: ModuleParametersInjector.Disabled
     }
-
-    private val modulesNames: List<String> = configModulesNames
+    private val modules by lazy {
+        environment.moduleConfigReferences.map(::dynamicModule) +
+            rootConfig.modules.map { module -> module.toDynamicModuleOrNull() ?: module.wrapWithDynamicModule() }
+    }
 
     private var applicationInstance: Application? = Application(
         environment,
@@ -83,6 +93,8 @@ actual constructor(
 
     /**
      * Reload application: destroy it first and then create again
+     *
+     * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.server.engine.EmbeddedServer.reload)
      */
     public fun reload() {
         applicationInstanceLock.write {
@@ -211,7 +223,11 @@ actual constructor(
     }
 
     private fun safeRaiseEvent(event: EventDefinition<Application>, application: Application) {
-        monitor.raiseCatching(event, application)
+        try {
+            monitor.raise(event, application)
+        } catch (cause: Throwable) {
+            environment.log.debug("One or more of the handlers thrown an exception", cause)
+        }
     }
 
     private fun destroyApplication() {
@@ -223,16 +239,27 @@ actual constructor(
         if (currentApplication != null) {
             safeRaiseEvent(ApplicationStopping, currentApplication)
             try {
-                currentApplication.dispose()
-                (currentApplicationClassLoader as? OverridingClassLoader)?.close()
+                destroyBlocking(currentApplication, currentApplicationClassLoader)
             } catch (e: Throwable) {
                 environment.log.error("Failed to destroy application instance.", e)
             }
-
             safeRaiseEvent(ApplicationStopped, currentApplication)
         }
         packageWatchKeys.forEach { it.cancel() }
         packageWatchKeys = mutableListOf()
+    }
+
+    @OptIn(InternalAPI::class)
+    private fun destroyBlocking(application: Application, classLoader: ClassLoader?) {
+        try {
+            runBlocking {
+                withTimeout(engineConfig.shutdownTimeout) {
+                    application.disposeAndJoin()
+                }
+            }
+        } finally {
+            (classLoader as? OverridingClassLoader)?.close()
+        }
     }
 
     private fun watchUrls(urls: List<URL>) {
@@ -354,34 +381,74 @@ actual constructor(
         safeRaiseEvent(ApplicationStarting, newInstance)
 
         avoidingDoubleStartup {
-            modulesNames.forEach { name ->
-                launchModuleByName(name, currentClassLoader, newInstance)
-            }
-
-            rootConfig.modules.forEach { module ->
-                val name = module.methodName()
-
-                try {
-                    launchModuleByName(name, currentClassLoader, newInstance)
-                } catch (_: ReloadingException) {
-                    module(newInstance)
-                }
+            withTimeout(environment.startupTimeout) {
+                environment.moduleLoader.loadModules(
+                    newInstance,
+                    currentClassLoader,
+                    modules,
+                )
             }
         }
 
-        safeRaiseEvent(ApplicationStarted, newInstance)
+        monitor.raise(ApplicationModulesLoaded, newInstance)
+        monitor.raise(ApplicationStarted, newInstance)
+
         return newInstance
     }
 
-    private fun launchModuleByName(name: String, currentClassLoader: ClassLoader, newInstance: Application) {
-        avoidingDoubleStartupFor(name) {
-            executeModuleFunction(currentClassLoader, name, newInstance)
+    private fun dynamicModule(name: String): DynamicApplicationModule {
+        return DynamicApplicationModule(name, { classLoader ->
+            val application = this
+            launchModuleByName(name, classLoader, application)
+        })
+    }
+
+    private fun ApplicationModule.toDynamicModuleOrNull(): DynamicApplicationModule? {
+        // Programmatic modules are loaded dynamically only when development mode is active
+        if (!rootConfig.developmentMode) return null
+
+        val module = this
+        // Method name getting might fail if method signature has been changed after compilation
+        // (for example by R8 or ProGuard)
+        val name = runCatching { module.methodName() }
+            .onFailure { cause ->
+                environment.log.debug(
+                    "Module can't be loaded dynamically, auto-reloading won't work for this module",
+                    cause,
+                )
+            }
+            .getOrElse { return null }
+
+        return DynamicApplicationModule(name) { classLoader ->
+            val application = this
+            try {
+                launchModuleByName(name, classLoader, application)
+            } catch (cause: ReloadingException) {
+                environment.log.debug(
+                    "Failed to load module '$name' by classpath reference, falling back to currently loaded value",
+                    cause,
+                )
+                module.invoke(application)
+            }
         }
     }
 
-    private fun avoidingDoubleStartup(block: () -> Unit) {
+    private fun ApplicationModule.wrapWithDynamicModule(): DynamicApplicationModule {
+        val module = this
+        return DynamicApplicationModule { module() }
+    }
+
+    private suspend fun launchModuleByName(name: String, currentClassLoader: ClassLoader, newInstance: Application) {
+        avoidingDoubleStartupFor(name) {
+            executeModuleFunction(currentClassLoader, name, newInstance, moduleInjector)
+        }
+    }
+
+    private fun avoidingDoubleStartup(block: suspend () -> Unit) {
         try {
-            block()
+            runBlocking {
+                block()
+            }
         } finally {
             currentStartupModules.get()?.let {
                 if (it.isEmpty()) {
@@ -391,7 +458,7 @@ actual constructor(
         }
     }
 
-    private fun avoidingDoubleStartupFor(fqName: String, block: () -> Unit) {
+    private suspend fun avoidingDoubleStartupFor(fqName: String, block: suspend () -> Unit) {
         val modules = currentStartupModules.getOrSet { ArrayList(1) }
         check(!modules.contains(fqName)) {
             "Module startup is already in progress for function $fqName (recursive module startup from module main?)"

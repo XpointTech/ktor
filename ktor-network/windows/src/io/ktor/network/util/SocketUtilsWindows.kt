@@ -100,7 +100,7 @@ internal actual fun sockaddr.toNativeSocketAddress(): NativeSocketAddress = when
         val address = ptr.reinterpret<sockaddr_in6>().pointed
         NativeIPv6SocketAddress(
             address.sin6_family.convert(),
-            address.sin6_addr,
+            address.sin6_addr.readValue(),
             networkToHostOrder(address.sin6_port).toInt(),
             address.sin6_flowinfo,
             address.sin6_scope_id
@@ -292,4 +292,10 @@ internal actual fun getSocketError(): Int {
 
 internal actual fun isWouldBlockError(error: Int): Boolean {
     return error == WSAEWOULDBLOCK || error == WSAEINPROGRESS
+}
+
+@OptIn(ExperimentalForeignApi::class)
+internal actual fun closeSocketDescriptor(descriptor: Int): Int {
+    // On Windows closesocket MUST be used instead of close to properly close sockets.
+    return platform.posix.closesocket(descriptor.convert())
 }

@@ -4,11 +4,15 @@
 
 description = ""
 
-kotlin.sourceSets {
-    commonMain {
-        dependencies {
-            api(project(":ktor-client:ktor-client-core"))
-            api(project(":ktor-shared:ktor-test-base"))
+plugins {
+    id("ktorbuild.project.internal")
+}
+
+kotlin {
+    sourceSets {
+        commonMain.dependencies {
+            api(projects.ktorClientCore)
+            api(projects.ktorTestBase)
         }
     }
 }
