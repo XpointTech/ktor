@@ -26,7 +26,7 @@ import kotlin.coroutines.resumeWithException
 internal class WinHttpRequest(
     hSession: COpaquePointer,
     data: HttpRequestData,
-    config: WinHttpClientEngineConfig
+    private val config: WinHttpClientEngineConfig
 ) : Closeable {
     private val connect: WinHttpConnect
 
@@ -138,6 +138,8 @@ internal class WinHttpRequest(
             if (WinHttpReceiveResponse(hRequest, null) == 0) {
                 throw getWinHttpException(ERROR_FAILED_TO_RECEIVE_RESPONSE)
             }
+
+            config.challengeHandler?.invoke(hRequest)
         }
     }
 
