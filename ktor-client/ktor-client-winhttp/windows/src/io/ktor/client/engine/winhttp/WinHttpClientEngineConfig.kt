@@ -6,6 +6,13 @@ package io.ktor.client.engine.winhttp
 
 import io.ktor.client.engine.*
 import io.ktor.http.*
+import kotlinx.cinterop.*
+
+/**
+ * A challenge handler type.
+ */
+@OptIn(ExperimentalForeignApi::class)
+public typealias ChallengeHandler = (hRequest: COpaquePointer) -> Unit
 
 public class WinHttpClientEngineConfig : HttpClientEngineConfig() {
 
@@ -31,4 +38,17 @@ public class WinHttpClientEngineConfig : HttpClientEngineConfig() {
      * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.engine.winhttp.WinHttpClientEngineConfig.sslVerify)
      */
     public var sslVerify: Boolean = true
+
+    /**
+     * Handles the challenge of HTTP responses.
+     */
+    public var challengeHandler: ChallengeHandler? = null
+
+    /**
+     * Sets the [block] as an HTTP request challenge handler.
+     */
+    @OptIn(ExperimentalForeignApi::class)
+    public fun handleChallenge(block: ChallengeHandler) {
+        challengeHandler = block
+    }
 }
