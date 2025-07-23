@@ -15,8 +15,8 @@ kotlin {
 
     sourceSets {
         windowsMain.dependencies {
-            api(projects.ktorClientCore)
-            api(projects.ktorHttpCio)
+            implementation("io.ktor:ktor-client-core:3.2.1")
+            implementation("io.ktor:ktor-http-cio:3.2.1")
         }
         windowsTest.dependencies {
             implementation(projects.ktorClientTestBase)

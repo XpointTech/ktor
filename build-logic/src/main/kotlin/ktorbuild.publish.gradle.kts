@@ -70,8 +70,8 @@ plugins.withId("ktorbuild.kmp") {
 }
 
 private fun Project.configureSigning(mavenPublishing: MavenPublishBaseExtension) {
-    extra["signing.gnupg.keyName"] = (System.getenv("SIGN_KEY_ID") ?: return)
-    extra["signing.gnupg.passphrase"] = (System.getenv("SIGN_KEY_PASSPHRASE") ?: return)
+    extra["signing.gnupg.keyName"] = "D3AAB305E85DA3A9"
+    extra["signing.gnupg.passphrase"] = "018826e1c30f884fa8f53263b4acca47"
 
     mavenPublishing.signAllPublications()
     signing.useGpgCmd()

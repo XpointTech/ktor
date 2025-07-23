@@ -9,7 +9,7 @@ plugins {
 kotlin {
     sourceSets {
         commonMain.dependencies {
-            api(projects.ktorClientCore)
+            implementation("io.ktor:ktor-client-core:3.2.1")
         }
     }
 }
