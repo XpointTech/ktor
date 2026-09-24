@@ -5,50 +5,57 @@
 package io.ktor.client.engine.winhttp
 
 import io.ktor.client.engine.*
+import io.ktor.client.engine.winhttp.internal.*
 import io.ktor.http.*
-import kotlinx.cinterop.*
-
-/**
- * A challenge handler type.
- */
-@OptIn(ExperimentalForeignApi::class)
-public typealias ChallengeHandler = (hRequest: COpaquePointer) -> Unit
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 public class WinHttpClientEngineConfig : HttpClientEngineConfig() {
 
     /**
-     * A value indicating whether HTTP 2.0 protocol is enabled in WinHTTP.
-     * The default value is true.
+     * A value that allows to set the preferred HTTP protocol version.
      *
      * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.engine.winhttp.WinHttpClientEngineConfig.protocolVersion)
      */
-    public var protocolVersion: HttpProtocolVersion = HttpProtocolVersion.HTTP_2_0
+    public var protocolVersion: HttpProtocolVersion = HttpProtocolVersion.HTTP_1_1
 
     /**
-     * A value that allows to set required security protocol versions.
-     * By default will be used system setting.
+     * A value that allows you to specify the security protocols
+     * that will be used in TLS sessions.
      *
      * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.engine.winhttp.WinHttpClientEngineConfig.securityProtocols)
      */
     public var securityProtocols: WinHttpSecurityProtocol = WinHttpSecurityProtocol.Default
 
     /**
-     * A value that disables TLS verification for outgoing requests.
+     * A value indicating whether to verify the server certificate.
+     * This option is insecure and should be used for development purposes only.
      *
      * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.engine.winhttp.WinHttpClientEngineConfig.sslVerify)
      */
     public var sslVerify: Boolean = true
 
     /**
-     * Handles the challenge of HTTP responses.
+     * Root chain overrides registered via [overrideRootChain].
      */
-    public var challengeHandler: ChallengeHandler? = null
+    internal val rootChainOverrides = mutableListOf<RootChainOverride>()
 
     /**
-     * Sets the [block] as an HTTP request challenge handler.
+     * Instructs the engine to validate the server certificate of every host matching
+     * [hostPattern] against the given root CA certificates instead of the OS root store.
+     *
+     * [hostPattern] supports `*` wildcards, e.g. `*.example.com`. Each element of
+     * [rootCaBase64] is a base64-encoded DER certificate (a PEM body without the
+     * `BEGIN`/`END CERTIFICATE` markers); line breaks are ignored.
+     *
+     * When validation fails, the request is completed exceptionally
+     * with [WinHttpSecurityException].
      */
-    @OptIn(ExperimentalForeignApi::class)
-    public fun handleChallenge(block: ChallengeHandler) {
-        challengeHandler = block
+    @OptIn(ExperimentalEncodingApi::class)
+    public fun overrideRootChain(hostPattern: String, vararg rootCaBase64: String) {
+        rootChainOverrides += RootChainOverride(
+            hostPatternToRegex(hostPattern),
+            rootCaBase64.map { Base64.Mime.decode(it) }
+        )
     }
 }

@@ -19,6 +19,7 @@ internal class WinHttpSession(private val config: WinHttpClientEngineConfig) : C
     private var hSession: COpaquePointer
     private val closed = atomic(false)
     private val timeoutConfigured = atomic(false)
+    private val certificateVerifier = WinHttpCertificateVerifier(config.rootChainOverrides)
 
     init {
         hSession = WinHttpOpen(
@@ -39,7 +40,7 @@ internal class WinHttpSession(private val config: WinHttpClientEngineConfig) : C
     fun createRequest(data: HttpRequestData): WinHttpRequest {
         configureTimeouts(data)
 
-        return WinHttpRequest(hSession, data, config)
+        return WinHttpRequest(hSession, data, config, certificateVerifier)
     }
 
     private fun configureTimeouts(data: HttpRequestData) {
@@ -104,6 +105,7 @@ internal class WinHttpSession(private val config: WinHttpClientEngineConfig) : C
         if (!closed.compareAndSet(expect = false, update = true)) return
 
         WinHttpCloseHandle(hSession)
+        certificateVerifier.close()
     }
 
     companion object {

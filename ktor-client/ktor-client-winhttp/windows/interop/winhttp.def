@@ -1,9 +1,9 @@
 package = io.ktor.cinterop.winhttp
-headers = wtypes.h winhttp.h
-headerFilter = winhttp.h
+headers = wtypes.h wincrypt.h winhttp.h
+headerFilter = winhttp.h wincrypt.h
 
 compilerOpts = -DUNICODE
-linkerOpts = -lwinhttp
+linkerOpts = -lwinhttp -lcrypt32
 ---
 // These WebSocket declarations are not present in our sysroots,
 // so we add them here.
@@ -125,3 +125,19 @@ WinHttpWebSocketQueryCloseStatus
     _In_range_(0, WINHTTP_WEB_SOCKET_MAX_CLOSE_REASON_LENGTH) DWORD dwReasonLength,
     _Out_range_(0, WINHTTP_WEB_SOCKET_MAX_CLOSE_REASON_LENGTH) DWORD *pdwReasonLengthConsumed
 );
+
+// CertVerifyCertificateChainPolicy takes a policy OID that is really an integer
+// constant cast to LPCSTR (CERT_CHAIN_POLICY_SSL = (LPCSTR)4), which cannot be
+// expressed from Kotlin. This wrapper bakes the SSL policy in.
+BOOL CCertVerifyCertificateChainPolicySsl(
+    _In_ PCCERT_CHAIN_CONTEXT pChainContext,
+    _In_ PCERT_CHAIN_POLICY_PARA pPolicyPara,
+    _Inout_ PCERT_CHAIN_POLICY_STATUS pPolicyStatus
+    )
+{
+    return CertVerifyCertificateChainPolicy(
+        CERT_CHAIN_POLICY_SSL,
+        pChainContext,
+        pPolicyPara,
+        pPolicyStatus);
+}

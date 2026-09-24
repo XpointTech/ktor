@@ -26,7 +26,8 @@ import kotlin.coroutines.resumeWithException
 internal class WinHttpRequest(
     hSession: COpaquePointer,
     data: HttpRequestData,
-    private val config: WinHttpClientEngineConfig
+    config: WinHttpClientEngineConfig,
+    private val certificateVerifier: WinHttpCertificateVerifier
 ) : Closeable {
     private val connect: WinHttpConnect
 
@@ -83,7 +84,17 @@ internal class WinHttpRequest(
             }.joinToString("\r\n")
 
             connect.on(WinHttpCallbackStatus.SendRequestComplete) { _, _ ->
-                continuation.resume(Unit)
+                // The TLS handshake is complete at this point, so the server certificate
+                // is validated here, before the request body is written and the response
+                // is requested. Failures resume the continuation exceptionally instead of
+                // throwing: this callback runs on a WinHTTP worker thread where a thrown
+                // exception cannot propagate and would abort the process.
+                val securityFailure = certificateVerifier.findFailure(hRequest)
+                if (securityFailure != null) {
+                    continuation.resumeWithException(securityFailure)
+                } else {
+                    continuation.resume(Unit)
+                }
             }
 
             // Send request
@@ -138,8 +149,6 @@ internal class WinHttpRequest(
             if (WinHttpReceiveResponse(hRequest, null) == 0) {
                 throw getWinHttpException(ERROR_FAILED_TO_RECEIVE_RESPONSE)
             }
-
-            config.challengeHandler?.invoke(hRequest)
         }
     }
 
