@@ -31,4 +31,26 @@ public class WinHttpClientEngineConfig : HttpClientEngineConfig() {
      * [Report a problem](https://ktor.io/feedback/?fqname=io.ktor.client.engine.winhttp.WinHttpClientEngineConfig.sslVerify)
      */
     public var sslVerify: Boolean = true
+
+    /**
+     * Root chain overrides registered via [overrideRootChain].
+     */
+    public val rootChainOverrides: MutableList<WinHttpRootChainOverride> = mutableListOf()
+
+    /**
+     * Validates certificates of hosts matching [hostPattern] against [certificates] instead
+     * of the operating system root CA list.
+     *
+     * A request to a matching host whose certificate does not chain to one of [certificates]
+     * fails with [WinHttpSecurityException] after the TLS handshake but before the request
+     * body is sent, so no application data reaches the untrusted peer.
+     *
+     * Hosts that match no registered pattern keep using the system root store.
+     *
+     * @param hostPattern a glob such as `*.example.com`, matched case-insensitively.
+     * @param certificates root CA certificates in base64-encoded DER, with or without PEM armour.
+     */
+    public fun overrideRootChain(hostPattern: String, vararg certificates: String) {
+        rootChainOverrides += WinHttpRootChainOverride(hostPattern, certificates.toList())
+    }
 }

@@ -26,8 +26,10 @@ import kotlin.coroutines.resumeWithException
 internal class WinHttpRequest(
     hSession: COpaquePointer,
     data: HttpRequestData,
-    config: WinHttpClientEngineConfig
+    config: WinHttpClientEngineConfig,
+    private val serverTrust: WinHttpServerTrust
 ) : Closeable {
+    private val requestHost = data.url.host
     private val connect: WinHttpConnect
 
     private val hRequest: COpaquePointer
@@ -77,6 +79,15 @@ internal class WinHttpRequest(
      * @param headers is request headers.
      */
     suspend fun sendRequest(headers: Map<String, String>) {
+        sendHeaders(headers)
+
+        // The TLS handshake has completed by this point and no native operation is in
+        // flight, so a rejection can propagate as an ordinary exception. Checking here
+        // also aborts before the request body is written.
+        serverTrust.verify(hRequest, requestHost)
+    }
+
+    private suspend fun sendHeaders(headers: Map<String, String>) {
         return closeableCoroutine(connect, ERROR_FAILED_TO_SEND_REQUEST) { continuation ->
             val headersString = headers.map {
                 "${it.key}: ${it.value}"

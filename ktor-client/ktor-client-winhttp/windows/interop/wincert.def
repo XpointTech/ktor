@@ -1,0 +1,23 @@
+package = io.ktor.cinterop.wincert
+headers = wtypes.h wincrypt.h
+headerFilter = wincrypt.h
+
+compilerOpts = -DUNICODE
+linkerOpts = -lcrypt32
+
+---
+// CERT_CHAIN_POLICY_SSL is a pseudo-OID: an integer constant passed where an LPCSTR is
+// expected. Kotlin/Native maps that parameter to String?, so it cannot be expressed from
+// Kotlin. This shim pins the policy on the C side.
+BOOL CCertVerifyCertificateChainPolicySSL(
+    _In_ PCCERT_CHAIN_CONTEXT pChainContext,
+    _In_ PCERT_CHAIN_POLICY_PARA pPolicyPara,
+    _Inout_ PCERT_CHAIN_POLICY_STATUS pPolicyStatus
+    )
+{
+    return CertVerifyCertificateChainPolicy(
+        CERT_CHAIN_POLICY_SSL,
+        pChainContext,
+        pPolicyPara,
+        pPolicyStatus);
+}

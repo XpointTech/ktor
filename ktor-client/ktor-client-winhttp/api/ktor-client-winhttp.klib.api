@@ -5,7 +5,7 @@
 // - Show manifest properties: true
 // - Show declarations: true
 
-// Library unique name: <io.ktor:ktor-client-winhttp>
+// Library unique name: <io.github.xpointtech:ktor-client-winhttp>
 final enum class io.ktor.client.engine.winhttp/WinHttpSecurityProtocol : kotlin/Enum<io.ktor.client.engine.winhttp/WinHttpSecurityProtocol> { // io.ktor.client.engine.winhttp/WinHttpSecurityProtocol|null[0]
     enum entry Default // io.ktor.client.engine.winhttp/WinHttpSecurityProtocol.Default|null[0]
     enum entry Tls10 // io.ktor.client.engine.winhttp/WinHttpSecurityProtocol.Tls10|null[0]
@@ -23,6 +23,9 @@ final enum class io.ktor.client.engine.winhttp/WinHttpSecurityProtocol : kotlin/
 final class io.ktor.client.engine.winhttp/WinHttpClientEngineConfig : io.ktor.client.engine/HttpClientEngineConfig { // io.ktor.client.engine.winhttp/WinHttpClientEngineConfig|null[0]
     constructor <init>() // io.ktor.client.engine.winhttp/WinHttpClientEngineConfig.<init>|<init>(){}[0]
 
+    final val rootChainOverrides // io.ktor.client.engine.winhttp/WinHttpClientEngineConfig.rootChainOverrides|{}rootChainOverrides[0]
+        final fun <get-rootChainOverrides>(): kotlin.collections/MutableList<io.ktor.client.engine.winhttp/WinHttpRootChainOverride> // io.ktor.client.engine.winhttp/WinHttpClientEngineConfig.rootChainOverrides.<get-rootChainOverrides>|<get-rootChainOverrides>(){}[0]
+
     final var protocolVersion // io.ktor.client.engine.winhttp/WinHttpClientEngineConfig.protocolVersion|{}protocolVersion[0]
         final fun <get-protocolVersion>(): io.ktor.http/HttpProtocolVersion // io.ktor.client.engine.winhttp/WinHttpClientEngineConfig.protocolVersion.<get-protocolVersion>|<get-protocolVersion>(){}[0]
         final fun <set-protocolVersion>(io.ktor.http/HttpProtocolVersion) // io.ktor.client.engine.winhttp/WinHttpClientEngineConfig.protocolVersion.<set-protocolVersion>|<set-protocolVersion>(io.ktor.http.HttpProtocolVersion){}[0]
@@ -32,6 +35,26 @@ final class io.ktor.client.engine.winhttp/WinHttpClientEngineConfig : io.ktor.cl
     final var sslVerify // io.ktor.client.engine.winhttp/WinHttpClientEngineConfig.sslVerify|{}sslVerify[0]
         final fun <get-sslVerify>(): kotlin/Boolean // io.ktor.client.engine.winhttp/WinHttpClientEngineConfig.sslVerify.<get-sslVerify>|<get-sslVerify>(){}[0]
         final fun <set-sslVerify>(kotlin/Boolean) // io.ktor.client.engine.winhttp/WinHttpClientEngineConfig.sslVerify.<set-sslVerify>|<set-sslVerify>(kotlin.Boolean){}[0]
+
+    final fun overrideRootChain(kotlin/String, kotlin/Array<out kotlin/String>...) // io.ktor.client.engine.winhttp/WinHttpClientEngineConfig.overrideRootChain|overrideRootChain(kotlin.String;kotlin.Array<out|kotlin.String>...){}[0]
+}
+
+final class io.ktor.client.engine.winhttp/WinHttpRootChainOverride { // io.ktor.client.engine.winhttp/WinHttpRootChainOverride|null[0]
+    constructor <init>(kotlin/String, kotlin.collections/List<kotlin/String>) // io.ktor.client.engine.winhttp/WinHttpRootChainOverride.<init>|<init>(kotlin.String;kotlin.collections.List<kotlin.String>){}[0]
+
+    final val certificates // io.ktor.client.engine.winhttp/WinHttpRootChainOverride.certificates|{}certificates[0]
+        final fun <get-certificates>(): kotlin.collections/List<kotlin/String> // io.ktor.client.engine.winhttp/WinHttpRootChainOverride.certificates.<get-certificates>|<get-certificates>(){}[0]
+    final val hostPattern // io.ktor.client.engine.winhttp/WinHttpRootChainOverride.hostPattern|{}hostPattern[0]
+        final fun <get-hostPattern>(): kotlin/String // io.ktor.client.engine.winhttp/WinHttpRootChainOverride.hostPattern.<get-hostPattern>|<get-hostPattern>(){}[0]
+}
+
+final class io.ktor.client.engine.winhttp/WinHttpSecurityException : kotlin/Exception { // io.ktor.client.engine.winhttp/WinHttpSecurityException|null[0]
+    constructor <init>(kotlin/String, kotlin/UInt, kotlin/String) // io.ktor.client.engine.winhttp/WinHttpSecurityException.<init>|<init>(kotlin.String;kotlin.UInt;kotlin.String){}[0]
+
+    final val errorCode // io.ktor.client.engine.winhttp/WinHttpSecurityException.errorCode|{}errorCode[0]
+        final fun <get-errorCode>(): kotlin/UInt // io.ktor.client.engine.winhttp/WinHttpSecurityException.errorCode.<get-errorCode>|<get-errorCode>(){}[0]
+    final val host // io.ktor.client.engine.winhttp/WinHttpSecurityException.host|{}host[0]
+        final fun <get-host>(): kotlin/String // io.ktor.client.engine.winhttp/WinHttpSecurityException.host.<get-host>|<get-host>(){}[0]
 }
 
 final object io.ktor.client.engine.winhttp/WinHttp : io.ktor.client.engine/HttpClientEngineFactory<io.ktor.client.engine.winhttp/WinHttpClientEngineConfig> { // io.ktor.client.engine.winhttp/WinHttp|null[0]
