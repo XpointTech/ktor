@@ -12,6 +12,7 @@ import platform.winhttp.*
 @OptIn(ExperimentalForeignApi::class)
 internal enum class WinHttpCallbackStatus(val value: UInt) {
     SecureFailure(WINHTTP_CALLBACK_STATUS_SECURE_FAILURE.convert<UInt>()),
+    SendingRequest(WINHTTP_CALLBACK_STATUS_SENDING_REQUEST.convert<UInt>()),
     HeadersAvailable(WINHTTP_CALLBACK_STATUS_HEADERS_AVAILABLE.convert<UInt>()),
     DataAvailable(WINHTTP_CALLBACK_STATUS_DATA_AVAILABLE.convert<UInt>()),
     ReadComplete(WINHTTP_CALLBACK_STATUS_READ_COMPLETE.convert<UInt>()),

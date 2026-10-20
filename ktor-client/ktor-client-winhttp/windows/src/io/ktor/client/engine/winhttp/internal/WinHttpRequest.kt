@@ -35,6 +35,7 @@ internal class WinHttpRequest(
     private val hRequest: COpaquePointer
     private val closed = atomic(false)
     private val requestClosed = atomic(false)
+    private val trustFailure = atomic<Exception?>(null)
 
     private val connectReference: StableRef<WinHttpConnect>
 
@@ -79,12 +80,12 @@ internal class WinHttpRequest(
      * @param headers is request headers.
      */
     suspend fun sendRequest(headers: Map<String, String>) {
-        sendHeaders(headers)
-
-        // The TLS handshake has completed by this point and no native operation is in
-        // flight, so a rejection can propagate as an ordinary exception. Checking here
-        // also aborts before the request body is written.
-        serverTrust.verify(hRequest, requestHost)
+        try {
+            sendHeaders(headers)
+        } catch (cause: Exception) {
+            throw trustFailure.value ?: cause
+        }
+        trustFailure.value?.let { throw it }
     }
 
     private suspend fun sendHeaders(headers: Map<String, String>) {
@@ -93,8 +94,24 @@ internal class WinHttpRequest(
                 "${it.key}: ${it.value}"
             }.joinToString("\r\n")
 
+            // Fires after the TLS handshake and before the request line and headers are
+            // written, so a rejected peer receives no request data. This runs on the WinHTTP
+            // callback thread, where throwing would crash the process: the failure is recorded
+            // and the request handle closed, which aborts the send and lets WinHTTP finish it
+            // through its usual completion; sendRequest then rethrows the recorded failure.
+            connect.on(WinHttpCallbackStatus.SendingRequest) { _, _ ->
+                try {
+                    serverTrust.verify(hRequest, requestHost)
+                } catch (cause: Exception) {
+                    trustFailure.value = cause
+                    if (requestClosed.compareAndSet(expect = false, update = true)) {
+                        WinHttpCloseHandle(hRequest)
+                    }
+                }
+            }
+
             connect.on(WinHttpCallbackStatus.SendRequestComplete) { _, _ ->
-                continuation.resume(Unit)
+                if (continuation.isActive) continuation.resume(Unit)
             }
 
             // Send request
@@ -252,7 +269,7 @@ internal class WinHttpRequest(
      * Receive status callbacks about all operations.
      */
     private fun configureStatusCallback(enable: Boolean) = memScoped {
-        val notifications = WINHTTP_CALLBACK_FLAG_ALL_COMPLETIONS.convert<UInt>()
+        val notifications = (WINHTTP_CALLBACK_FLAG_ALL_COMPLETIONS or WINHTTP_CALLBACK_FLAG_SEND_REQUEST).convert<UInt>()
         val callback = if (enable) {
             staticCFunction(::winHttpCallback)
         } else {

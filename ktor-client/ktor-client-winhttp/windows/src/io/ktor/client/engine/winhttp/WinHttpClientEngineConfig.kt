@@ -43,7 +43,7 @@ public class WinHttpClientEngineConfig : HttpClientEngineConfig() {
      *
      * A request to a matching host whose certificate does not chain to one of [certificates]
      * fails with [WinHttpSecurityException] after the TLS handshake but before the request
-     * body is sent, so no application data reaches the untrusted peer.
+     * line and headers are sent, so no application data reaches the untrusted peer.
      *
      * Hosts that match no registered pattern keep using the system root store.
      *

@@ -67,7 +67,7 @@ public class WinHttpRootChainOverride(
 /**
  * Thrown when a server certificate fails validation against a [WinHttpRootChainOverride].
  *
- * The request is aborted before the request body is sent and before any response is read,
+ * The request is aborted before the request line, headers or body are sent,
  * so no application data is exchanged with the untrusted peer.
  *
  * @property host the host whose certificate was rejected.
