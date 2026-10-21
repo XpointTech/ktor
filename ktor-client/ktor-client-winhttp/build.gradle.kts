@@ -10,8 +10,14 @@ plugins {
     id("test-server")
 }
 
+// Published under the fork's own coordinates. Scoped to this project so that its
+// dependencies still resolve to the upstream io.ktor:*:3.2.1 artifacts.
+group = "io.github.xpointtech"
+version = "3.2.1.2"
+
 kotlin {
     createCInterop("winhttp", sourceSet = "windows")
+    createCInterop("wincert", sourceSet = "windows")
 
     sourceSets {
         windowsMain.dependencies {
